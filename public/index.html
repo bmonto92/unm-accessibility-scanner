@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>UNM Document Accessibility Checker — CTL</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,300&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --cherry-d: #5C1010; --cherry: #8B1A1A; --cherry-l: #C4342D;
+    --gold: #C9973A; --gold-l: #E8C06A;
+    --cream: #FAF7F2; --ink: #1C1714; --ink-m: #4A3F38; --ink-l: #8A7D74;
+    --border: #E0D8D0; --white: #FFFFFF;
+    --success: #2D6A4F; --warn: #7A4A00;
+    --crit: #9B1010; --maj: #7A4A00; --min: #1F4E79;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(--ink); min-height: 100vh; }
+
+  header { background: var(--cherry-d); position: relative; overflow: hidden; }
+  header::before { content:''; position:absolute; inset:0; background:repeating-linear-gradient(-45deg,transparent,transparent 40px,rgba(255,255,255,.025) 40px,rgba(255,255,255,.025) 41px); }
+  .header-inner { max-width:860px; margin:0 auto; padding:36px 32px 32px; position:relative; }
+  .unm-badge { display:inline-flex; align-items:center; background:rgba(255,255,255,.12); border:1px solid rgba(255,255,255,.2); border-radius:4px; padding:4px 12px; font-size:11px; font-weight:600; letter-spacing:.1em; text-transform:uppercase; color:var(--gold-l); margin-bottom:16px; }
+  header h1 { font-family:'Playfair Display',serif; font-size:clamp(22px,4vw,32px); color:var(--white); line-height:1.2; margin-bottom:8px; }
+  header p  { font-size:14px; color:rgba(255,255,255,.72); font-weight:300; max-width:540px; line-height:1.6; }
+  .header-rule { height:3px; background:linear-gradient(90deg,var(--gold),var(--cherry-l),transparent); }
+
+  main { max-width:860px; margin:0 auto; padding:36px 32px 80px; }
+
+  .card { background:var(--white); border:1.5px solid var(--border); border-radius:10px; padding:24px 28px; margin-bottom:18px; }
+  .card-title { font-family:'Playfair Display',serif; font-size:16px; color:var(--cherry-d); margin-bottom:4px; }
+  .card-sub   { font-size:13px; color:var(--ink-l); margin-bottom:16px; line-height:1.5; }
+
+  /* Upload zone */
+  .upload-zone { border:2px dashed var(--border); border-radius:10px; padding:56px 24px; text-align:center; cursor:pointer; transition:all .2s; background:var(--cream); position:relative; }
+  .upload-zone:hover, .upload-zone.drag-over { border-color:var(--cherry); background:#FFF5F5; }
+  .upload-zone input { position:absolute; inset:0; opacity:0; cursor:pointer; width:100%; height:100%; }
+  .upload-icon  { font-size:40px; margin-bottom:12px; }
+  .upload-title { font-size:16px; font-weight:600; color:var(--ink); margin-bottom:4px; }
+  .upload-sub   { font-size:13px; color:var(--ink-l); margin-bottom:14px; }
+  .type-pills   { display:flex; gap:8px; justify-content:center; flex-wrap:wrap; }
+  .type-pill    { font-size:11px; font-weight:600; padding:3px 11px; border-radius:99px; background:var(--border); color:var(--ink-m); letter-spacing:.04em; }
+
+  /* File loaded state */
+  .file-loaded-bar { background:#EDF7F2; border:1.5px solid var(--success); border-radius:10px; padding:16px 20px; display:flex; align-items:center; gap:14px; margin-top:14px; }
+  .file-loaded-name { font-size:14px; font-weight:600; color:var(--success); }
+  .file-loaded-size { font-size:12px; color:var(--ink-l); }
+  .file-clear { margin-left:auto; background:none; border:1px solid var(--border); border-radius:6px; padding:6px 13px; font-size:12px; cursor:pointer; color:var(--ink-m); font-family:'DM Sans',sans-serif; }
+  .file-clear:hover { background:var(--cream); }
+
+  /* Audit button */
+  .audit-btn { width:100%; padding:16px 24px; background:linear-gradient(135deg,var(--cherry-d),var(--cherry-l)); color:var(--white); border:none; border-radius:8px; font-family:'DM Sans',sans-serif; font-size:15px; font-weight:600; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:10px; transition:all .2s; letter-spacing:.02em; margin-top:4px; }
+  .audit-btn:hover:not(:disabled) { transform:translateY(-1px); box-shadow:0 6px 20px rgba(92,16,16,.3); }
+  .audit-btn:disabled { opacity:.5; cursor:not-allowed; transform:none; }
+
+  /* Status */
+  .status-box { background:var(--ink); color:rgba(255,255,255,.85); border-radius:8px; padding:18px 22px; margin-top:16px; font-size:13px; line-height:1.9; font-family:'Courier New',monospace; display:none; }
+  .status-box.visible { display:block; }
+  .s-line { opacity:0; transform:translateY(4px); transition:all .3s; }
+  .s-line.show { opacity:1; transform:none; }
+  .s-dot { display:inline-block; width:7px; height:7px; border-radius:50%; margin-right:8px; animation:pulse 1s infinite; }
+  .s-dot.loading { background:var(--gold); }
+  .s-dot.done    { background:#52C97A; animation:none; }
+  .s-dot.err     { background:#E85555; animation:none; }
+  @keyframes pulse { 0%,100%{opacity:1}50%{opacity:.3} }
+
+  /* Score banner */
+  .score-banner { border-radius:10px; padding:20px 24px; display:none; margin-top:18px; }
+  .score-banner.visible { display:flex; align-items:center; gap:20px; flex-wrap:wrap; }
+  .score-num { font-family:'Playfair Display',serif; font-size:52px; font-weight:700; color:var(--white); line-height:1; }
+  .score-label { font-size:13px; color:rgba(255,255,255,.8); margin-bottom:2px; }
+  .score-grade { font-size:22px; font-weight:600; color:var(--white); }
+  .score-counts { margin-left:auto; display:flex; gap:12px; flex-wrap:wrap; }
+  .count-pill { background:rgba(255,255,255,.2); border-radius:8px; padding:8px 16px; text-align:center; }
+  .count-num  { font-size:22px; font-weight:700; color:var(--white); display:block; }
+  .count-lbl  { font-size:11px; color:rgba(255,255,255,.75); font-weight:500; }
+
+  /* Issues list */
+  .issues-section { display:none; margin-top:18px; }
+  .issues-section.visible { display:block; }
+  .section-heading { font-family:'Playfair Display',serif; font-size:20px; color:var(--cherry-d); margin-bottom:4px; }
+  .section-sub { font-size:13px; color:var(--ink-l); margin-bottom:16px; }
+
+  .issue-card { border:1.5px solid var(--border); border-radius:8px; overflow:hidden; margin-bottom:12px; }
+  .issue-header { display:grid; grid-template-columns:auto 1fr; align-items:center; gap:0; }
+  .issue-sev { padding:12px 16px; font-size:11px; font-weight:700; letter-spacing:.07em; text-transform:uppercase; color:var(--white); writing-mode:horizontal-tb; min-width:90px; text-align:center; }
+  .sev-critical { background:var(--crit); }
+  .sev-major    { background:var(--maj); }
+  .sev-minor    { background:var(--min); }
+  .issue-rule   { padding:12px 16px; font-size:13px; font-weight:600; color:var(--ink); background:var(--cream); }
+  .issue-body   { padding:14px 16px; display:grid; grid-template-columns:100px 1fr; gap:10px 16px; }
+  .issue-label  { font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.05em; color:var(--ink-l); padding-top:2px; }
+  .issue-value  { font-size:13px; color:var(--ink); line-height:1.5; }
+  .issue-value.fix { color:var(--cherry-d); font-weight:500; }
+  .wcag-ref     { font-size:11px; color:var(--ink-l); margin-top:2px; }
+
+  /* Passed checks */
+  .passed-section { display:none; margin-top:16px; }
+  .passed-section.visible { display:block; }
+  .passed-list { list-style:none; }
+  .passed-list li { font-size:13px; color:var(--success); padding:5px 0; display:flex; align-items:flex-start; gap:8px; border-bottom:0.5px solid var(--border); }
+  .passed-list li:last-child { border-bottom:none; }
+  .check-icon { flex-shrink:0; font-size:14px; }
+
+  /* Download */
+  .download-btn { width:100%; padding:15px 24px; background:var(--success); color:var(--white); border:none; border-radius:8px; font-family:'DM Sans',sans-serif; font-size:15px; font-weight:600; cursor:pointer; display:none; align-items:center; justify-content:center; gap:10px; margin-top:16px; transition:all .2s; }
+  .download-btn.visible { display:flex; }
+  .download-btn:hover { background:#245C42; transform:translateY(-1px); }
+
+  /* Tip */
+  .tip-box { background:#FFF8EC; border:1px solid var(--gold-l); border-left:4px solid var(--gold); border-radius:6px; padding:11px 15px; font-size:13px; color:var(--warn); margin-bottom:16px; line-height:1.5; }
+
+  @media(max-width:600px){
+    main{padding:20px 14px 60px;}
+    .header-inner{padding:22px 16px 18px;}
+    .card{padding:18px 16px;}
+    .issue-body{grid-template-columns:1fr;}
+    .score-banner.visible{flex-direction:column; align-items:flex-start;}
+    .score-counts{margin-left:0;}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-inner">
+    <div class="unm-badge">⬡ UNM Center for Teaching &amp; Learning</div>
+    <h1>Document Accessibility Checker</h1>
+    <p>Upload a course document to get a full accessibility audit report — checked against WCAG 2.2 AA, Section 508, and UNM Element 11 standards.</p>
+  </div>
+  <div class="header-rule"></div>
+</header>
+
+<main>
+
+  <div class="tip-box">
+    💡 <strong>Supported formats:</strong> PDF, Word (.docx), and PowerPoint (.pptx). Your file is sent securely to the UNM CTL server for analysis and is not stored.
+  </div>
+
+  <!-- Upload card -->
+  <div class="card">
+    <div class="card-title">📂 Upload Your Document</div>
+    <div class="card-sub">Drag and drop your file, or click to browse.</div>
+
+    <div class="upload-zone" id="upload-zone">
+      <input type="file" id="file-input" accept=".pdf,.docx,.pptx" onchange="handleFile(event)" aria-label="Upload document for accessibility audit">
+      <div class="upload-icon">📄</div>
+      <div class="upload-title">Drop your file here</div>
+      <div class="upload-sub">Accepts PDF, Word, and PowerPoint files</div>
+      <div class="type-pills">
+        <span class="type-pill">PDF</span>
+        <span class="type-pill">DOCX</span>
+        <span class="type-pill">PPTX</span>
+      </div>
+    </div>
+
+    <div id="file-bar" style="display:none;">
+      <div class="file-loaded-bar">
+        <span style="font-size:28px" id="file-icon">📄</span>
+        <div>
+          <div class="file-loaded-name" id="file-name">document.docx</div>
+          <div class="file-loaded-size" id="file-size">0 KB</div>
+        </div>
+        <button class="file-clear" onclick="clearFile()" aria-label="Remove uploaded file">✕ Remove</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Run button -->
+  <button class="audit-btn" id="audit-btn" onclick="runAudit()" disabled aria-label="Run accessibility audit">
+    🔍 Run Accessibility Audit
+  </button>
+
+  <!-- Status log -->
+  <div class="status-box" id="status-box" aria-live="polite" aria-label="Audit progress"></div>
+
+  <!-- Score banner -->
+  <div class="score-banner" id="score-banner" role="region" aria-label="Audit score">
+    <div>
+      <div class="score-label">Accessibility score</div>
+      <div class="score-num" id="score-num">—</div>
+      <div class="score-grade" id="score-grade">—</div>
+    </div>
+    <div class="score-counts">
+      <div class="count-pill"><span class="count-num" id="cnt-critical">0</span><span class="count-lbl">Critical</span></div>
+      <div class="count-pill"><span class="count-num" id="cnt-major">0</span><span class="count-lbl">Major</span></div>
+      <div class="count-pill"><span class="count-num" id="cnt-minor">0</span><span class="count-lbl">Minor</span></div>
+      <div class="count-pill"><span class="count-num" id="cnt-passed">0</span><span class="count-lbl">Passed</span></div>
+    </div>
+  </div>
+
+  <!-- Issues list -->
+  <div class="issues-section" id="issues-section">
+    <div class="section-heading">Issues to Fix</div>
+    <div class="section-sub">Sorted from most to least severe. Fix Critical issues first.</div>
+    <div id="issues-list"></div>
+  </div>
+
+  <!-- Passed checks -->
+  <div class="passed-section" id="passed-section">
+    <div class="card">
+      <div class="card-title">✅ Checks Passed</div>
+      <ul class="passed-list" id="passed-list"></ul>
+    </div>
+  </div>
+
+  <!-- Download report -->
+  <button class="download-btn" id="download-btn" onclick="downloadReport()" aria-label="Download full accessibility report as Word document">
+    ⬇️ Download Full Report (.docx)
+  </button>
+
+</main>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/docx/8.5.0/docx.umd.min.js"></script>
+<script>
+// ── State ──
+let uploadedFile   = null;
+let auditData      = null;
+let reportBuffer   = null;
+
+// ── File handling ──
+const uz = document.getElementById('upload-zone');
+uz.addEventListener('dragover', e => { e.preventDefault(); uz.classList.add('drag-over'); });
+uz.addEventListener('dragleave', () => uz.classList.remove('drag-over'));
+uz.addEventListener('drop', e => { e.preventDefault(); uz.classList.remove('drag-over'); if(e.dataTransfer.files[0]) loadFile(e.dataTransfer.files[0]); });
+function handleFile(e) { if(e.target.files[0]) loadFile(e.target.files[0]); }
+
+const icons = { pdf:'📕', docx:'📝', pptx:'📊', doc:'📝', ppt:'📊' };
+function loadFile(file) {
+  const ext = file.name.split('.').pop().toLowerCase();
+  if (!['pdf','docx','pptx','doc','ppt'].includes(ext)) {
+    alert('Please upload a PDF, Word (.docx), or PowerPoint (.pptx) file.');
+    return;
+  }
+  uploadedFile = file;
+  document.getElementById('file-name').textContent = file.name;
+  document.getElementById('file-size').textContent = (file.size/1024).toFixed(1) + ' KB';
+  document.getElementById('file-icon').textContent = icons[ext] || '📄';
+  document.getElementById('file-bar').style.display = 'block';
+  document.getElementById('upload-zone').style.display = 'none';
+  document.getElementById('audit-btn').disabled = false;
+  resetResults();
+}
+function clearFile() {
+  uploadedFile = null;
+  document.getElementById('file-bar').style.display = 'none';
+  document.getElementById('upload-zone').style.display = 'block';
+  document.getElementById('file-input').value = '';
+  document.getElementById('audit-btn').disabled = true;
+  resetResults();
+}
+function resetResults() {
+  document.getElementById('status-box').classList.remove('visible');
+  document.getElementById('score-banner').classList.remove('visible');
+  document.getElementById('issues-section').classList.remove('visible');
+  document.getElementById('passed-section').classList.remove('visible');
+  document.getElementById('download-btn').classList.remove('visible');
+  auditData = null; reportBuffer = null;
+}
+
+// ── Status helpers ──
+function showStatus() { const b=document.getElementById('status-box'); b.classList.add('visible'); b.innerHTML=''; }
+function addStatus(msg, type='loading') {
+  const b=document.getElementById('status-box');
+  const d=document.createElement('div'); d.className='s-line';
+  d.innerHTML=`<span class="s-dot ${type}"></span>${msg}`;
+  b.appendChild(d); setTimeout(()=>d.classList.add('show'),40);
+}
+function updateLast(msg,type='done') {
+  const last=document.getElementById('status-box').lastElementChild;
+  if(last) last.innerHTML=`<span class="s-dot ${type}"></span>${msg}`;
+}
+
+// ── Run audit ──
+async function runAudit() {
+  if(!uploadedFile) return;
+  document.getElementById('audit-btn').disabled = true;
+  resetResults();
+  showStatus();
+  addStatus('Reading file…');
+
+  try {
+    // Read file as base64
+    const base64 = await new Promise((res,rej) => {
+      const reader = new FileReader();
+      reader.onload  = () => res(reader.result.split(',')[1]);
+      reader.onerror = () => rej(new Error('Could not read file'));
+      reader.readAsDataURL(uploadedFile);
+    });
+
+    const ext = uploadedFile.name.split('.').pop().toLowerCase();
+    const fileType = ext === 'doc' ? 'docx' : ext === 'ppt' ? 'pptx' : ext;
+
+    updateLast('File loaded — sending to audit server…','done');
+    addStatus('Running accessibility checks…');
+
+    const res = await fetch('/.netlify/functions/audit', {
+      method: 'POST',
+      headers: { 'Content-Type':'application/json' },
+      body: JSON.stringify({ fileName: uploadedFile.name, fileType, fileData: base64 })
+    });
+
+    if(!res.ok) {
+      const err = await res.json().catch(()=>({}));
+      throw new Error(err.error || `Server error ${res.status}`);
+    }
+
+    auditData = await res.json();
+    updateLast(`Audit complete — ${auditData.total} issue(s) found ✓`,'done');
+    addStatus('Building results…');
+
+    renderResults(auditData);
+    reportBuffer = await buildWordReport(auditData);
+
+    updateLast('Report ready ✓','done');
+    document.getElementById('download-btn').classList.add('visible');
+
+  } catch(err) {
+    updateLast('Error: ' + err.message, 'err');
+    console.error(err);
+  } finally {
+    document.getElementById('audit-btn').disabled = false;
+  }
+}
+
+// ── Render results in page ──
+function renderResults(data) {
+  // Score banner
+  const gradeBg = {Perfect:'#1A6B2F',Good:'#1A6B2F','Needs work':'#7A4A00',Poor:'#9B1010',Critical:'#9B1010'};
+  const banner = document.getElementById('score-banner');
+  banner.style.background = gradeBg[data.grade] || '#595959';
+  banner.classList.add('visible');
+  document.getElementById('score-num').textContent   = data.score;
+  document.getElementById('score-grade').textContent = data.grade;
+  document.getElementById('cnt-critical').textContent = data.critical;
+  document.getElementById('cnt-major').textContent    = data.major;
+  document.getElementById('cnt-minor').textContent    = data.minor;
+  document.getElementById('cnt-passed').textContent   = data.passed;
+
+  // Issues
+  const issuesList = document.getElementById('issues-list');
+  issuesList.innerHTML = '';
+  if(data.issues?.length) {
+    data.issues.forEach((issue,i) => {
+      const card = document.createElement('div');
+      card.className = 'issue-card';
+      card.setAttribute('role','article');
+      card.setAttribute('aria-label',`Issue ${i+1}: ${issue.severity} — ${issue.rule}`);
+      card.innerHTML = `
+        <div class="issue-header">
+          <div class="issue-sev sev-${issue.severity}">${issue.severity}</div>
+          <div class="issue-rule">${issue.rule.replace(/-/g,' ')}</div>
+        </div>
+        <div class="issue-body">
+          <div class="issue-label">What</div>
+          <div class="issue-value">${issue.description}</div>
+          <div class="issue-label">Where</div>
+          <div class="issue-value">${issue.location}</div>
+          <div class="issue-label">How to fix</div>
+          <div class="issue-value fix">${issue.howToFix}</div>
+          ${issue.wcagRef ? `<div class="issue-label">WCAG ref</div><div class="issue-value wcag-ref">${issue.wcagRef}</div>` : ''}
+        </div>`;
+      issuesList.appendChild(card);
+    });
+    document.getElementById('issues-section').classList.add('visible');
+  }
+
+  // Passed checks
+  if(data.issues && data.total === 0) {
+    const noIssues = document.createElement('div');
+    noIssues.className = 'card';
+    noIssues.innerHTML = '<div class="card-title" style="color:var(--success)">🎉 No issues found!</div><p style="font-size:14px;color:var(--ink-l);margin-top:8px">This file passes all automated accessibility checks.</p>';
+    document.getElementById('issues-list').appendChild(noIssues);
+    document.getElementById('issues-section').classList.add('visible');
+  }
+
+  const passedList = document.getElementById('passed-list');
+  passedList.innerHTML = '';
+  if(data.issues?.length && auditData) {
+    // We need the full result — passed list comes from summary
+  }
+  // Re-fetch passed from data if available
+  if(window._auditPassed?.length) {
+    window._auditPassed.forEach(p => {
+      const li = document.createElement('li');
+      li.innerHTML = `<span class="check-icon">✓</span>${p}`;
+      passedList.appendChild(li);
+    });
+    document.getElementById('passed-section').classList.add('visible');
+  }
+}
+
+// ── Build Word report ──
+async function buildWordReport(data) {
+  const { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell,
+          HeadingLevel, BorderStyle, WidthType, ShadingType } = docx;
+
+  const CHERRY="5C1010", BLUE="1F4E79", BLACK="000000", WHITE="FFFFFF";
+  const bd = {style:BorderStyle.SINGLE,size:1,color:"CCCCCC"};
+  const borders={top:bd,bottom:bd,left:bd,right:bd};
+  const shade = fill => ({type:ShadingType.CLEAR,color:"auto",fill});
+
+  const sevBg    = {critical:"FFE0E0",major:"FFF2CC",minor:"EBF3FB"};
+  const sevColor = {critical:"9B1010",major:"7A4A00",minor:"1F4E79"};
+  const gradeBg  = {Perfect:"1A6B2F",Good:"1A6B2F","Needs work":"7A4A00",Poor:"9B1010",Critical:"9B1010"};
+
+  const p = (text,opts={}) => new Paragraph({
+    ...(opts.h?{heading:opts.h}:{}), ...(opts.bullet?{bullet:{level:0}}:{}),
+    spacing:{before:opts.before||40,after:opts.after||80},
+    children:[new TextRun({text:String(text||''),font:"Calibri",size:opts.size||22,
+      bold:opts.bold||false,italic:opts.italic||false,color:opts.color||BLACK})]
+  });
+
+  const cp = (text,opts={}) => new Paragraph({spacing:{before:60,after:60},children:[
+    new TextRun({text:String(text||''),font:"Calibri",size:20,bold:opts.bold||false,color:opts.color||BLACK})
+  ]});
+
+  const tc = (text,bg,opts={}) => new TableCell({borders,shading:shade(bg||"FFFFFF"),
+    margins:{top:70,bottom:70,left:120,right:120},
+    ...(opts.w?{width:{size:opts.w,type:WidthType.DXA}}:{}),
+    children:[cp(text,opts)]});
+
+  const children=[];
+
+  // Title
+  children.push(p("Accessibility Audit Report",{h:HeadingLevel.HEADING_1,size:36,bold:true,color:CHERRY,before:0,after:60}));
+  children.push(p("WCAG 2.2 AA  |  Section 508  |  UNM Online Learning Excellence Framework — Element 11",{size:19,italic:true,color:"595959",before:0,after:160}));
+
+  // Meta
+  children.push(new Table({width:{size:9360,type:WidthType.DXA},columnWidths:[1800,7560],rows:[
+    ["File",data.fileName,"F7F7F7"],
+    ["File type",data.fileType?.toUpperCase()||"","FFFFFF"],
+    ["Score",`${data.score} out of 100 — ${data.grade}`,sevBg[data.grade?.toLowerCase()]||"F2F2F2"],
+  ].map(([l,v,bg])=>new TableRow({children:[
+    tc(l,"1F4E79",{bold:true,color:WHITE,w:1800}),
+    new TableCell({borders,shading:shade(bg),margins:{top:70,bottom:70,left:120,right:120},width:{size:7560,type:WidthType.DXA},children:[cp(v,{bold:l==="Score",color:BLACK})]})
+  ]}))}));
+  children.push(p("",{before:160,after:0}));
+
+  // Summary counts
+  children.push(p("Summary",{h:HeadingLevel.HEADING_1,size:28,bold:true,color:CHERRY,before:240,after:80}));
+  children.push(new Table({width:{size:9360,type:WidthType.DXA},columnWidths:[2340,2340,2340,2340],rows:[
+    new TableRow({children:["Critical issues","Major issues","Minor issues","Checks passed"].map(h=>tc(h,"1F4E79",{bold:true,color:WHITE}))}),
+    new TableRow({children:[
+      [String(data.critical),"FFE0E0","9B1010"],
+      [String(data.major),"FFF2CC","7A4A00"],
+      [String(data.minor),"EBF3FB","1F4E79"],
+      [String(data.passed),"E2EFDA","2D6A4F"],
+    ].map(([v,bg,c])=>new TableCell({borders,shading:shade(bg),margins:{top:70,bottom:70,left:120,right:120},children:[
+      new Paragraph({spacing:{before:60,after:60},children:[new TextRun({text:v,font:"Calibri",size:24,bold:true,color:c})]})
+    ]}))})
+  ]}));
+  children.push(p("",{before:160,after:0}));
+
+  // Issues
+  if(data.issues?.length){
+    children.push(p("Issues to Fix",{h:HeadingLevel.HEADING_1,size:28,bold:true,color:CHERRY,before:240,after:80}));
+    children.push(p("Sorted from most to least severe. Fix Critical issues first.",{size:20,italic:true,color:"595959",before:0,after:100}));
+    data.issues.forEach((issue,i)=>{
+      const bg=sevBg[issue.severity]||"F2F2F2";
+      const sc=sevColor[issue.severity]||BLACK;
+      const tbl=new Table({width:{size:9360,type:WidthType.DXA},columnWidths:[1600,7760],rows:[
+        new TableRow({children:[tc(`Issue ${i+1} of ${data.issues.length}`,"2E74B5",{bold:true,color:WHITE,w:1600}),
+          new TableCell({borders,shading:shade("2E74B5"),margins:{top:70,bottom:70,left:120,right:120},width:{size:7760,type:WidthType.DXA},
+            children:[cp(`[${issue.severity.toUpperCase()}]  ${issue.rule}`,{bold:true,color:WHITE})]})]}),
+        ...[ ["What",issue.description],["Where",issue.location],["How to fix",issue.howToFix],
+             ...(issue.wcagRef?[["WCAG ref",issue.wcagRef]]:[]) ]
+          .map(([lbl,val])=>new TableRow({children:[tc(lbl,"F2F2F2",{bold:true,w:1600}),
+            new TableCell({borders,shading:shade(bg),margins:{top:70,bottom:70,left:120,right:120},width:{size:7760,type:WidthType.DXA},children:[cp(val)]})]}))
+      ]});
+      children.push(tbl);
+      children.push(p("",{before:60,after:0}));
+    });
+  } else {
+    children.push(p("No Issues Found",{h:HeadingLevel.HEADING_1,size:28,bold:true,color:"2D6A4F",before:240,after:80}));
+    children.push(p("This file passes all automated accessibility checks.",{before:0,after:80}));
+  }
+
+  // Footer
+  children.push(new Paragraph({spacing:{before:240,after:0},border:{top:{style:BorderStyle.SINGLE,size:1,color:"CCCCCC"}},
+    children:[new TextRun({text:"Generated by UNM CTL Accessibility Audit Tool  |  WCAG 2.2 AA  |  Section 508  |  UNM Online Learning Excellence Framework Element 11  |  This report is authored to meet WCAG 2.2 AA standards.",
+      font:"Calibri",size:18,italic:true,color:"808080"})]}));
+
+  const document = new Document({
+    title:`Accessibility Audit Report — ${data.fileName}`,
+    description:"WCAG 2.2 AA / Section 508 / UNM Framework Element 11 accessibility audit",
+    styles:{
+      default:{document:{run:{font:"Calibri",size:22,color:BLACK}}},
+      paragraphStyles:[
+        {id:"Heading1",name:"Heading 1",basedOn:"Normal",next:"Normal",quickFormat:true,run:{size:28,bold:true,font:"Calibri",color:CHERRY},paragraph:{spacing:{before:240,after:80},outlineLevel:0}},
+      ]
+    },
+    sections:[{properties:{page:{margin:{top:1440,right:1440,bottom:1440,left:1440}}},children}]
+  });
+  return await Packer.toBuffer(document);
+}
+
+// ── Download ──
+function downloadReport() {
+  if(!reportBuffer) return;
+  const safeName = (auditData?.fileName||'document').replace(/[^a-zA-Z0-9._-]/g,'_');
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([reportBuffer],{type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'}));
+  a.download=safeName.replace(/\.[^.]+$/,'')+'_accessibility_report.docx';
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+</script>
+</body>
+</html>

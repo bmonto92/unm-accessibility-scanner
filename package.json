@@ -1,0 +1,10 @@
+{
+  "name": "unm-accessibility-scanner",
+  "version": "1.0.0",
+  "description": "UNM CTL Accessibility Audit Tool — Netlify deployment",
+  "dependencies": {
+    "jszip": "^3.10.1",
+    "pdf-parse": "^1.1.1",
+    "mammoth": "^1.6.0"
+  }
+}
