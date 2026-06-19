@@ -294,7 +294,7 @@ async function runAudit() {
     updateLast('File loaded — sending to audit server…','done');
     addStatus('Running accessibility checks…');
 
-    const res = await fetch('/.netlify/functions/audit', {
+    const res = await fetch('/api/audit', {
       method: 'POST',
       headers: { 'Content-Type':'application/json' },
       body: JSON.stringify({ fileName: uploadedFile.name, fileType, fileData: base64 })
