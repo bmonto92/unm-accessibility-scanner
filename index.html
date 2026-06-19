@@ -41,12 +41,23 @@
   .type-pills   { display:flex; gap:8px; justify-content:center; flex-wrap:wrap; }
   .type-pill    { font-size:11px; font-weight:600; padding:3px 11px; border-radius:99px; background:var(--border); color:var(--ink-m); letter-spacing:.04em; }
 
-  /* File loaded state */
-  .file-loaded-bar { background:#EDF7F2; border:1.5px solid var(--success); border-radius:10px; padding:16px 20px; display:flex; align-items:center; gap:14px; margin-top:14px; }
-  .file-loaded-name { font-size:14px; font-weight:600; color:var(--success); }
-  .file-loaded-size { font-size:12px; color:var(--ink-l); }
-  .file-clear { margin-left:auto; background:none; border:1px solid var(--border); border-radius:6px; padding:6px 13px; font-size:12px; cursor:pointer; color:var(--ink-m); font-family:'DM Sans',sans-serif; }
-  .file-clear:hover { background:var(--cream); }
+  .alt-upload-row { text-align:center; margin-top:12px; }
+  .folder-select-btn { background:none; border:1px dashed var(--border); border-radius:6px; padding:9px 18px; font-size:12.5px; color:var(--cherry-d); cursor:pointer; font-family:'DM Sans',sans-serif; font-weight:600; }
+  .folder-select-btn:hover { background:#FFF5F5; border-color:var(--cherry); }
+
+  /* Loaded files list */
+  .file-list-wrap { margin-top:14px; }
+  .file-list-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; }
+  .file-list-count { font-size:14px; font-weight:600; color:var(--success); }
+  .clear-all-btn { background:none; border:1px solid var(--border); border-radius:6px; padding:6px 13px; font-size:12px; cursor:pointer; color:var(--ink-m); font-family:'DM Sans',sans-serif; }
+  .clear-all-btn:hover { background:var(--cream); }
+  .file-row { display:flex; align-items:center; gap:12px; padding:10px 14px; border:1.5px solid var(--success); background:#EDF7F2; border-radius:8px; margin-bottom:8px; }
+  .file-row-icon { font-size:22px; flex-shrink:0; }
+  .file-row-info { flex:1; min-width:0; }
+  .file-row-name { font-size:13px; font-weight:600; color:var(--ink); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .file-row-size { font-size:11px; color:var(--ink-l); }
+  .file-row-remove { background:none; border:1px solid var(--border); border-radius:6px; cursor:pointer; font-size:12px; padding:5px 9px; color:var(--ink-m); font-family:'DM Sans',sans-serif; flex-shrink:0; }
+  .file-row-remove:hover { background:var(--white); color:var(--cherry); }
 
   /* Audit button */
   .audit-btn { width:100%; padding:16px 24px; background:linear-gradient(135deg,var(--cherry-d),var(--cherry-l)); color:var(--white); border:none; border-radius:8px; font-family:'DM Sans',sans-serif; font-size:15px; font-weight:600; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:10px; transition:all .2s; letter-spacing:.02em; margin-top:4px; }
@@ -75,11 +86,27 @@
   .count-num  { font-size:22px; font-weight:700; color:var(--white); display:block; }
   .count-lbl  { font-size:11px; color:rgba(255,255,255,.75); font-weight:500; }
 
+  /* Per-file breakdown table (multi-file only) */
+  .breakdown-section { display:none; margin-top:18px; }
+  .breakdown-section.visible { display:block; }
+  .breakdown-head, .breakdown-row { display:grid; grid-template-columns:1fr 64px 100px 1fr; gap:10px; align-items:center; padding:9px 4px; }
+  .breakdown-head { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; color:var(--ink-l); border-bottom:1.5px solid var(--border); padding-bottom:8px; }
+  .breakdown-row { font-size:13px; border-bottom:0.5px solid var(--border); }
+  .breakdown-row:last-child { border-bottom:none; }
+  .bd-name { font-weight:600; color:var(--ink); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .bd-score { font-weight:700; color:var(--cherry-d); }
+  .bd-grade { color:var(--ink-m); }
+  .bd-issues { color:var(--ink-l); font-size:12px; }
+
   /* Issues list */
   .issues-section { display:none; margin-top:18px; }
   .issues-section.visible { display:block; }
   .section-heading { font-family:'Playfair Display',serif; font-size:20px; color:var(--cherry-d); margin-bottom:4px; }
   .section-sub { font-size:13px; color:var(--ink-l); margin-bottom:16px; }
+
+  .file-group-heading { display:flex; justify-content:space-between; align-items:baseline; gap:10px; margin:24px 0 10px; padding-bottom:6px; border-bottom:2px solid var(--cherry-l); flex-wrap:wrap; }
+  .file-group-heading .fgh-name { font-family:'Playfair Display',serif; font-size:16px; color:var(--cherry-d); font-weight:700; }
+  .file-group-heading .fgh-score { font-size:12px; color:var(--ink-l); }
 
   .issue-card { border:1.5px solid var(--border); border-radius:8px; overflow:hidden; margin-bottom:12px; }
   .issue-header { display:grid; grid-template-columns:auto 1fr; align-items:center; gap:0; }
@@ -93,14 +120,6 @@
   .issue-value  { font-size:13px; color:var(--ink); line-height:1.5; }
   .issue-value.fix { color:var(--cherry-d); font-weight:500; }
   .wcag-ref     { font-size:11px; color:var(--ink-l); margin-top:2px; }
-
-  /* Passed checks */
-  .passed-section { display:none; margin-top:16px; }
-  .passed-section.visible { display:block; }
-  .passed-list { list-style:none; }
-  .passed-list li { font-size:13px; color:var(--success); padding:5px 0; display:flex; align-items:flex-start; gap:8px; border-bottom:0.5px solid var(--border); }
-  .passed-list li:last-child { border-bottom:none; }
-  .check-icon { flex-shrink:0; font-size:14px; }
 
   /* Download */
   .download-btn { width:100%; padding:15px 24px; background:var(--success); color:var(--white); border:none; border-radius:8px; font-family:'DM Sans',sans-serif; font-size:15px; font-weight:600; cursor:pointer; display:none; align-items:center; justify-content:center; gap:10px; margin-top:16px; transition:all .2s; }
@@ -117,6 +136,8 @@
     .issue-body{grid-template-columns:1fr;}
     .score-banner.visible{flex-direction:column; align-items:flex-start;}
     .score-counts{margin-left:0;}
+    .breakdown-head, .breakdown-row{grid-template-columns:1fr 50px 80px;}
+    .bd-issues{display:none;}
   }
 </style>
 </head>
@@ -124,9 +145,9 @@
 
 <header>
   <div class="header-inner">
-    <div class="unm-badge">⬡ UNM Center for Teaching &amp; Learning</div>
+    <div class="unm-badge">⬡ UNM - <a href="https://business.unm.edu/" style="color:#000000; text-decoration:underline;">The James &amp; Gail Ellis School of Business Leadership</a></div>
     <h1>Document Accessibility Checker</h1>
-    <p>Upload a course document to get a full accessibility audit report — checked against WCAG 2.2 AA, Section 508, and UNM Element 11 standards.</p>
+    <p>Upload course documents — one file, several files, or an entire folder — to get a full accessibility audit checked against WCAG 2.2 AA, Section 508, and UNM Element 11 standards.</p>
   </div>
   <div class="header-rule"></div>
 </header>
@@ -134,19 +155,19 @@
 <main>
 
   <div class="tip-box">
-    💡 <strong>Supported formats:</strong> PDF, Word (.docx), and PowerPoint (.pptx). Your file is sent securely to the UNM CTL server for analysis and is not stored.
+    💡 <strong>Supported formats:</strong> PDF, Word (.docx), and PowerPoint (.pptx). You can upload a single file, select multiple files, or select an entire folder at once.
   </div>
 
   <!-- Upload card -->
   <div class="card">
-    <div class="card-title">📂 Upload Your Document</div>
-    <div class="card-sub">Drag and drop your file, or click to browse.</div>
+    <div class="card-title">📂 Upload Your Documents</div>
+    <div class="card-sub">Drag and drop files, click to browse, or select a whole folder.</div>
 
     <div class="upload-zone" id="upload-zone">
-      <input type="file" id="file-input" accept=".pdf,.docx,.pptx" onchange="handleFile(event)" aria-label="Upload document for accessibility audit">
+      <input type="file" id="file-input" accept=".pdf,.docx,.pptx" multiple onchange="handleFileInput(event)" aria-label="Upload documents for accessibility audit">
       <div class="upload-icon">📄</div>
-      <div class="upload-title">Drop your file here</div>
-      <div class="upload-sub">Accepts PDF, Word, and PowerPoint files</div>
+      <div class="upload-title">Drop your files here</div>
+      <div class="upload-sub">Accepts PDF, Word, and PowerPoint files — single or multiple</div>
       <div class="type-pills">
         <span class="type-pill">PDF</span>
         <span class="type-pill">DOCX</span>
@@ -154,14 +175,18 @@
       </div>
     </div>
 
+    <div class="alt-upload-row">
+      <input type="file" id="folder-input" webkitdirectory directory multiple style="display:none" onchange="handleFolderInput(event)" aria-label="Upload an entire folder for accessibility audit">
+      <button type="button" class="folder-select-btn" onclick="document.getElementById('folder-input').click()">📁 Or select an entire folder</button>
+    </div>
+
     <div id="file-bar" style="display:none;">
-      <div class="file-loaded-bar">
-        <span style="font-size:28px" id="file-icon">📄</span>
-        <div>
-          <div class="file-loaded-name" id="file-name">document.docx</div>
-          <div class="file-loaded-size" id="file-size">0 KB</div>
+      <div class="file-list-wrap">
+        <div class="file-list-header">
+          <span class="file-list-count" id="file-list-count">0 files loaded</span>
+          <button class="clear-all-btn" onclick="clearAllFiles()" aria-label="Remove all uploaded files">✕ Clear all</button>
         </div>
-        <button class="file-clear" onclick="clearFile()" aria-label="Remove uploaded file">✕ Remove</button>
+        <div id="file-list"></div>
       </div>
     </div>
   </div>
@@ -177,7 +202,7 @@
   <!-- Score banner -->
   <div class="score-banner" id="score-banner" role="region" aria-label="Audit score">
     <div>
-      <div class="score-label">Accessibility score</div>
+      <div class="score-label" id="score-label-text">Accessibility score</div>
       <div class="score-num" id="score-num">—</div>
       <div class="score-grade" id="score-grade">—</div>
     </div>
@@ -189,19 +214,22 @@
     </div>
   </div>
 
+  <!-- Per-file breakdown (shown only for multi-file audits) -->
+  <div class="breakdown-section" id="breakdown-section">
+    <div class="card">
+      <div class="card-title">📋 Per-File Breakdown</div>
+      <div class="breakdown-head">
+        <span>File</span><span>Score</span><span>Grade</span><span>Issues</span>
+      </div>
+      <div id="breakdown-body"></div>
+    </div>
+  </div>
+
   <!-- Issues list -->
   <div class="issues-section" id="issues-section">
     <div class="section-heading">Issues to Fix</div>
-    <div class="section-sub">Sorted from most to least severe. Fix Critical issues first.</div>
+    <div class="section-sub">Sorted from most to least severe within each file. Fix Critical issues first.</div>
     <div id="issues-list"></div>
-  </div>
-
-  <!-- Passed checks -->
-  <div class="passed-section" id="passed-section">
-    <div class="card">
-      <div class="card-title">✅ Checks Passed</div>
-      <ul class="passed-list" id="passed-list"></ul>
-    </div>
   </div>
 
   <!-- Download report -->
@@ -211,51 +239,108 @@
 
 </main>
 
+<footer style="text-align:center; padding:20px 0 8px; font-size:11px; color:var(--ink-l);">
+  Created by Brandi Cherair - MSPM/MBA - Student
+</footer>
+
 <script src="https://cdnjs.cloudflare.com/ajax/libs/docx/8.5.0/docx.umd.min.js"></script>
 <script>
 // ── State ──
-let uploadedFile   = null;
-let auditData      = null;
+let uploadedFiles  = [];   // array of File objects
+let auditResults   = [];   // array of per-file summary objects, in order
 let reportBuffer   = null;
 
-// ── File handling ──
+const VALID_EXT = ['pdf','docx','pptx','doc','ppt'];
+const icons = { pdf:'📕', docx:'📝', pptx:'📊', doc:'📝', ppt:'📊' };
+
+// ── Drag & drop on the zone ──
 const uz = document.getElementById('upload-zone');
 uz.addEventListener('dragover', e => { e.preventDefault(); uz.classList.add('drag-over'); });
 uz.addEventListener('dragleave', () => uz.classList.remove('drag-over'));
-uz.addEventListener('drop', e => { e.preventDefault(); uz.classList.remove('drag-over'); if(e.dataTransfer.files[0]) loadFile(e.dataTransfer.files[0]); });
-function handleFile(e) { if(e.target.files[0]) loadFile(e.target.files[0]); }
+uz.addEventListener('drop', e => {
+  e.preventDefault();
+  uz.classList.remove('drag-over');
+  if (e.dataTransfer.files && e.dataTransfer.files.length) loadFiles(e.dataTransfer.files);
+});
 
-const icons = { pdf:'📕', docx:'📝', pptx:'📊', doc:'📝', ppt:'📊' };
-function loadFile(file) {
-  const ext = file.name.split('.').pop().toLowerCase();
-  if (!['pdf','docx','pptx','doc','ppt'].includes(ext)) {
-    alert('Please upload a PDF, Word (.docx), or PowerPoint (.pptx) file.');
+function handleFileInput(e) { if (e.target.files.length) loadFiles(e.target.files); }
+function handleFolderInput(e) { if (e.target.files.length) loadFiles(e.target.files); }
+
+// ── File loading / validation ──
+function loadFiles(fileList) {
+  const incoming = Array.from(fileList);
+  const valid = [];
+  incoming.forEach(file => {
+    const ext = file.name.split('.').pop().toLowerCase();
+    if (!VALID_EXT.includes(ext)) return; // silently skip non-document files (e.g. images in a folder)
+    const dup = uploadedFiles.some(f => f.name === file.name && f.size === file.size);
+    if (!dup) valid.push(file);
+  });
+  uploadedFiles = uploadedFiles.concat(valid);
+  renderFileList();
+  resetResults();
+}
+
+function removeFile(idx) {
+  uploadedFiles.splice(idx, 1);
+  renderFileList();
+  resetResults();
+}
+
+function clearAllFiles() {
+  uploadedFiles = [];
+  document.getElementById('file-input').value = '';
+  document.getElementById('folder-input').value = '';
+  renderFileList();
+  resetResults();
+}
+
+function renderFileList() {
+  const bar  = document.getElementById('file-bar');
+  const zone = document.getElementById('upload-zone');
+  const list = document.getElementById('file-list');
+  const btn  = document.getElementById('audit-btn');
+
+  list.innerHTML = '';
+
+  if (uploadedFiles.length === 0) {
+    bar.style.display = 'none';
+    zone.style.display = 'block';
+    btn.disabled = true;
+    btn.innerHTML = '🔍 Run Accessibility Audit';
     return;
   }
-  uploadedFile = file;
-  document.getElementById('file-name').textContent = file.name;
-  document.getElementById('file-size').textContent = (file.size/1024).toFixed(1) + ' KB';
-  document.getElementById('file-icon').textContent = icons[ext] || '📄';
-  document.getElementById('file-bar').style.display = 'block';
-  document.getElementById('upload-zone').style.display = 'none';
-  document.getElementById('audit-btn').disabled = false;
-  resetResults();
+
+  zone.style.display = 'none';
+  bar.style.display = 'block';
+  document.getElementById('file-list-count').textContent =
+    `${uploadedFiles.length} file${uploadedFiles.length > 1 ? 's' : ''} loaded`;
+
+  uploadedFiles.forEach((file, idx) => {
+    const ext = file.name.split('.').pop().toLowerCase();
+    const row = document.createElement('div');
+    row.className = 'file-row';
+    row.innerHTML = `
+      <span class="file-row-icon">${icons[ext] || '📄'}</span>
+      <div class="file-row-info">
+        <div class="file-row-name">${file.name}</div>
+        <div class="file-row-size">${(file.size/1024).toFixed(1)} KB</div>
+      </div>
+      <button class="file-row-remove" onclick="removeFile(${idx})" aria-label="Remove ${file.name}">✕</button>`;
+    list.appendChild(row);
+  });
+
+  btn.disabled = false;
+  btn.innerHTML = `🔍 Run Accessibility Audit (${uploadedFiles.length} file${uploadedFiles.length > 1 ? 's' : ''})`;
 }
-function clearFile() {
-  uploadedFile = null;
-  document.getElementById('file-bar').style.display = 'none';
-  document.getElementById('upload-zone').style.display = 'block';
-  document.getElementById('file-input').value = '';
-  document.getElementById('audit-btn').disabled = true;
-  resetResults();
-}
+
 function resetResults() {
   document.getElementById('status-box').classList.remove('visible');
   document.getElementById('score-banner').classList.remove('visible');
+  document.getElementById('breakdown-section').classList.remove('visible');
   document.getElementById('issues-section').classList.remove('visible');
-  document.getElementById('passed-section').classList.remove('visible');
   document.getElementById('download-btn').classList.remove('visible');
-  auditData = null; reportBuffer = null;
+  auditResults = []; reportBuffer = null;
 }
 
 // ── Status helpers ──
@@ -271,127 +356,177 @@ function updateLast(msg,type='done') {
   if(last) last.innerHTML=`<span class="s-dot ${type}"></span>${msg}`;
 }
 
-// ── Run audit ──
+// ── Run audit (loops the existing single-file function across all loaded files) ──
 async function runAudit() {
-  if(!uploadedFile) return;
+  if (!uploadedFiles.length) return;
   document.getElementById('audit-btn').disabled = true;
   resetResults();
   showStatus();
-  addStatus('Reading file…');
+
+  const total = uploadedFiles.length;
+  auditResults = [];
+
+  for (let i = 0; i < total; i++) {
+    const file = uploadedFiles[i];
+    addStatus(`Auditing ${file.name} (${i+1} of ${total})…`);
+
+    try {
+      const base64 = await new Promise((res, rej) => {
+        const reader = new FileReader();
+        reader.onload  = () => res(reader.result.split(',')[1]);
+        reader.onerror = () => rej(new Error('Could not read file'));
+        reader.readAsDataURL(file);
+      });
+
+      const ext = file.name.split('.').pop().toLowerCase();
+      const fileType = ext === 'doc' ? 'docx' : ext === 'ppt' ? 'pptx' : ext;
+
+      const res = await fetch('/api/audit', {
+        method: 'POST',
+        headers: { 'Content-Type':'application/json' },
+        body: JSON.stringify({ fileName: file.name, fileType, fileData: base64 })
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(()=>({}));
+        throw new Error(err.error || `Server error ${res.status}`);
+      }
+
+      const summary = await res.json();
+      auditResults.push(summary);
+      updateLast(`${file.name} — score ${summary.score} (${summary.total} issue${summary.total !== 1 ? 's' : ''}) ✓`, 'done');
+
+    } catch (err) {
+      auditResults.push({
+        fileName: file.name, fileType: '', score: 0, grade: 'Error',
+        critical: 0, major: 0, minor: 0, total: 0, passed: 0, issues: [],
+        error: err.message
+      });
+      updateLast(`${file.name} — error: ${err.message}`, 'err');
+    }
+  }
+
+  addStatus('Building results…');
+  renderResults(auditResults);
 
   try {
-    // Read file as base64
-    const base64 = await new Promise((res,rej) => {
-      const reader = new FileReader();
-      reader.onload  = () => res(reader.result.split(',')[1]);
-      reader.onerror = () => rej(new Error('Could not read file'));
-      reader.readAsDataURL(uploadedFile);
-    });
-
-    const ext = uploadedFile.name.split('.').pop().toLowerCase();
-    const fileType = ext === 'doc' ? 'docx' : ext === 'ppt' ? 'pptx' : ext;
-
-    updateLast('File loaded — sending to audit server…','done');
-    addStatus('Running accessibility checks…');
-
-    const res = await fetch('/api/audit', {
-      method: 'POST',
-      headers: { 'Content-Type':'application/json' },
-      body: JSON.stringify({ fileName: uploadedFile.name, fileType, fileData: base64 })
-    });
-
-    if(!res.ok) {
-      const err = await res.json().catch(()=>({}));
-      throw new Error(err.error || `Server error ${res.status}`);
-    }
-
-    auditData = await res.json();
-    updateLast(`Audit complete — ${auditData.total} issue(s) found ✓`,'done');
-    addStatus('Building results…');
-
-    renderResults(auditData);
-    reportBuffer = await buildWordReport(auditData);
-
-    updateLast('Report ready ✓','done');
+    reportBuffer = await buildWordReport(auditResults);
+    updateLast('Report ready ✓', 'done');
     document.getElementById('download-btn').classList.add('visible');
-
-  } catch(err) {
-    updateLast('Error: ' + err.message, 'err');
-    console.error(err);
-  } finally {
-    document.getElementById('audit-btn').disabled = false;
+  } catch (e) {
+    updateLast('Could not build Word report: ' + e.message, 'err');
   }
+
+  document.getElementById('audit-btn').disabled = false;
+}
+
+// ── Aggregate stats across all files ──
+function aggregate(results) {
+  const valid = results.filter(r => !r.error);
+  const critical = results.reduce((s,r)=>s+(r.critical||0),0);
+  const major    = results.reduce((s,r)=>s+(r.major||0),0);
+  const minor    = results.reduce((s,r)=>s+(r.minor||0),0);
+  const passed   = results.reduce((s,r)=>s+(r.passed||0),0);
+  const avgScore = valid.length ? Math.round((valid.reduce((s,r)=>s+r.score,0)/valid.length)*10)/10 : 0;
+  const grade = avgScore===100?'Perfect':avgScore>=80?'Good':avgScore>=60?'Needs work':avgScore>=40?'Poor':'Critical';
+  return { critical, major, minor, passed, avgScore, grade };
 }
 
 // ── Render results in page ──
-function renderResults(data) {
-  // Score banner
+function renderResults(results) {
+  const multi = results.length > 1;
+  const agg = aggregate(results);
   const gradeBg = {Perfect:'#1A6B2F',Good:'#1A6B2F','Needs work':'#7A4A00',Poor:'#9B1010',Critical:'#9B1010'};
-  const banner = document.getElementById('score-banner');
-  banner.style.background = gradeBg[data.grade] || '#595959';
-  banner.classList.add('visible');
-  document.getElementById('score-num').textContent   = data.score;
-  document.getElementById('score-grade').textContent = data.grade;
-  document.getElementById('cnt-critical').textContent = data.critical;
-  document.getElementById('cnt-major').textContent    = data.major;
-  document.getElementById('cnt-minor').textContent    = data.minor;
-  document.getElementById('cnt-passed').textContent   = data.passed;
 
-  // Issues
+  // Score banner
+  const banner = document.getElementById('score-banner');
+  const gradeKey = multi ? agg.grade : (results[0]?.grade || '—');
+  banner.style.background = gradeBg[gradeKey] || '#595959';
+  banner.classList.add('visible');
+  document.getElementById('score-label-text').textContent = multi ? 'Average accessibility score' : 'Accessibility score';
+  document.getElementById('score-num').textContent   = multi ? agg.avgScore : (results[0]?.score ?? '—');
+  document.getElementById('score-grade').textContent = multi ? agg.grade : (results[0]?.grade ?? '—');
+  document.getElementById('cnt-critical').textContent = agg.critical;
+  document.getElementById('cnt-major').textContent    = agg.major;
+  document.getElementById('cnt-minor').textContent    = agg.minor;
+  document.getElementById('cnt-passed').textContent   = agg.passed;
+
+  // Per-file breakdown (multi-file only)
+  const breakdownSection = document.getElementById('breakdown-section');
+  const breakdownBody = document.getElementById('breakdown-body');
+  breakdownBody.innerHTML = '';
+  if (multi) {
+    results.forEach(r => {
+      const row = document.createElement('div');
+      row.className = 'breakdown-row';
+      row.innerHTML = `
+        <span class="bd-name">${r.fileName}</span>
+        <span class="bd-score">${r.error ? '—' : r.score}</span>
+        <span class="bd-grade">${r.error ? 'Error' : r.grade}</span>
+        <span class="bd-issues">${r.error ? r.error : `${r.total} issue${r.total !== 1 ? 's' : ''}`}</span>`;
+      breakdownBody.appendChild(row);
+    });
+    breakdownSection.classList.add('visible');
+  } else {
+    breakdownSection.classList.remove('visible');
+  }
+
+  // Issues, grouped by file when there's more than one
   const issuesList = document.getElementById('issues-list');
   issuesList.innerHTML = '';
-  if(data.issues?.length) {
-    data.issues.forEach((issue,i) => {
+
+  results.forEach(r => {
+    if (r.error) {
       const card = document.createElement('div');
-      card.className = 'issue-card';
-      card.setAttribute('role','article');
-      card.setAttribute('aria-label',`Issue ${i+1}: ${issue.severity} — ${issue.rule}`);
-      card.innerHTML = `
-        <div class="issue-header">
-          <div class="issue-sev sev-${issue.severity}">${issue.severity}</div>
-          <div class="issue-rule">${issue.rule.replace(/-/g,' ')}</div>
-        </div>
-        <div class="issue-body">
-          <div class="issue-label">What</div>
-          <div class="issue-value">${issue.description}</div>
-          <div class="issue-label">Where</div>
-          <div class="issue-value">${issue.location}</div>
-          <div class="issue-label">How to fix</div>
-          <div class="issue-value fix">${issue.howToFix}</div>
-          ${issue.wcagRef ? `<div class="issue-label">WCAG ref</div><div class="issue-value wcag-ref">${issue.wcagRef}</div>` : ''}
-        </div>`;
+      card.className = 'card';
+      card.innerHTML = `<div class="card-title" style="color:var(--crit)">⚠️ ${r.fileName}</div>
+        <p style="font-size:13px;color:var(--ink-l);margin-top:6px">Could not be audited: ${r.error}</p>`;
       issuesList.appendChild(card);
-    });
-    document.getElementById('issues-section').classList.add('visible');
-  }
+      return;
+    }
 
-  // Passed checks
-  if(data.issues && data.total === 0) {
-    const noIssues = document.createElement('div');
-    noIssues.className = 'card';
-    noIssues.innerHTML = '<div class="card-title" style="color:var(--success)">🎉 No issues found!</div><p style="font-size:14px;color:var(--ink-l);margin-top:8px">This file passes all automated accessibility checks.</p>';
-    document.getElementById('issues-list').appendChild(noIssues);
-    document.getElementById('issues-section').classList.add('visible');
-  }
+    if (multi) {
+      const heading = document.createElement('div');
+      heading.className = 'file-group-heading';
+      heading.innerHTML = `<span class="fgh-name">${r.fileName}</span><span class="fgh-score">Score: ${r.score} — ${r.grade}</span>`;
+      issuesList.appendChild(heading);
+    }
 
-  const passedList = document.getElementById('passed-list');
-  passedList.innerHTML = '';
-  if(data.issues?.length && auditData) {
-    // We need the full result — passed list comes from summary
-  }
-  // Re-fetch passed from data if available
-  if(window._auditPassed?.length) {
-    window._auditPassed.forEach(p => {
-      const li = document.createElement('li');
-      li.innerHTML = `<span class="check-icon">✓</span>${p}`;
-      passedList.appendChild(li);
-    });
-    document.getElementById('passed-section').classList.add('visible');
-  }
+    if (r.issues && r.issues.length) {
+      r.issues.forEach((issue,i) => {
+        const card = document.createElement('div');
+        card.className = 'issue-card';
+        card.setAttribute('role','article');
+        card.setAttribute('aria-label',`Issue ${i+1}: ${issue.severity} — ${issue.rule}`);
+        card.innerHTML = `
+          <div class="issue-header">
+            <div class="issue-sev sev-${issue.severity}">${issue.severity}</div>
+            <div class="issue-rule">${issue.rule.replace(/-/g,' ')}</div>
+          </div>
+          <div class="issue-body">
+            <div class="issue-label">What</div>
+            <div class="issue-value">${issue.description}</div>
+            <div class="issue-label">Where</div>
+            <div class="issue-value">${issue.location}</div>
+            <div class="issue-label">How to fix</div>
+            <div class="issue-value fix">${issue.howToFix}</div>
+            ${issue.wcagRef ? `<div class="issue-label">WCAG ref</div><div class="issue-value wcag-ref">${issue.wcagRef}</div>` : ''}
+          </div>`;
+        issuesList.appendChild(card);
+      });
+    } else {
+      const noIssues = document.createElement('div');
+      noIssues.className = 'card';
+      noIssues.innerHTML = '<div class="card-title" style="color:var(--success)">🎉 No issues found!</div><p style="font-size:14px;color:var(--ink-l);margin-top:8px">This file passes all automated accessibility checks.</p>';
+      issuesList.appendChild(noIssues);
+    }
+  });
+
+  document.getElementById('issues-section').classList.add('visible');
 }
 
-// ── Build Word report ──
-async function buildWordReport(data) {
+// ── Build Word report (single combined report; one section per file when multiple) ──
+async function buildWordReport(results) {
   const { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell,
           HeadingLevel, BorderStyle, WidthType, ShadingType } = docx;
 
@@ -402,10 +537,9 @@ async function buildWordReport(data) {
 
   const sevBg    = {critical:"FFE0E0",major:"FFF2CC",minor:"EBF3FB"};
   const sevColor = {critical:"9B1010",major:"7A4A00",minor:"1F4E79"};
-  const gradeBg  = {Perfect:"1A6B2F",Good:"1A6B2F","Needs work":"7A4A00",Poor:"9B1010",Critical:"9B1010"};
 
   const p = (text,opts={}) => new Paragraph({
-    ...(opts.h?{heading:opts.h}:{}), ...(opts.bullet?{bullet:{level:0}}:{}),
+    ...(opts.h?{heading:opts.h}:{}),
     spacing:{before:opts.before||40,after:opts.after||80},
     children:[new TextRun({text:String(text||''),font:"Calibri",size:opts.size||22,
       bold:opts.bold||false,italic:opts.italic||false,color:opts.color||BLACK})]
@@ -421,68 +555,121 @@ async function buildWordReport(data) {
     children:[cp(text,opts)]});
 
   const children=[];
+  const multi = results.length > 1;
 
   // Title
   children.push(p("Accessibility Audit Report",{h:HeadingLevel.HEADING_1,size:36,bold:true,color:CHERRY,before:0,after:60}));
   children.push(p("WCAG 2.2 AA  |  Section 508  |  UNM Online Learning Excellence Framework — Element 11",{size:19,italic:true,color:"595959",before:0,after:160}));
 
-  // Meta
-  children.push(new Table({width:{size:9360,type:WidthType.DXA},columnWidths:[1800,7560],rows:[
-    ["File",data.fileName,"F7F7F7"],
-    ["File type",data.fileType?.toUpperCase()||"","FFFFFF"],
-    ["Score",`${data.score} out of 100 — ${data.grade}`,sevBg[data.grade?.toLowerCase()]||"F2F2F2"],
-  ].map(([l,v,bg])=>new TableRow({children:[
-    tc(l,"1F4E79",{bold:true,color:WHITE,w:1800}),
-    new TableCell({borders,shading:shade(bg),margins:{top:70,bottom:70,left:120,right:120},width:{size:7560,type:WidthType.DXA},children:[cp(v,{bold:l==="Score",color:BLACK})]})
-  ]}))}));
-  children.push(p("",{before:160,after:0}));
+  if (multi) {
+    const agg = aggregate(results);
 
-  // Summary counts
-  children.push(p("Summary",{h:HeadingLevel.HEADING_1,size:28,bold:true,color:CHERRY,before:240,after:80}));
-  children.push(new Table({width:{size:9360,type:WidthType.DXA},columnWidths:[2340,2340,2340,2340],rows:[
-    new TableRow({children:["Critical issues","Major issues","Minor issues","Checks passed"].map(h=>tc(h,"1F4E79",{bold:true,color:WHITE}))}),
-    new TableRow({children:[
-      [String(data.critical),"FFE0E0","9B1010"],
-      [String(data.major),"FFF2CC","7A4A00"],
-      [String(data.minor),"EBF3FB","1F4E79"],
-      [String(data.passed),"E2EFDA","2D6A4F"],
-    ].map(([v,bg,c])=>new TableCell({borders,shading:shade(bg),margins:{top:70,bottom:70,left:120,right:120},children:[
-      new Paragraph({spacing:{before:60,after:60},children:[new TextRun({text:v,font:"Calibri",size:24,bold:true,color:c})]})
-    ]}))})
-  ]}));
-  children.push(p("",{before:160,after:0}));
+    children.push(p(`Folder audit — ${results.length} file(s) reviewed`,{size:22,bold:true,color:BLUE,before:0,after:140}));
 
-  // Issues
-  if(data.issues?.length){
-    children.push(p("Issues to Fix",{h:HeadingLevel.HEADING_1,size:28,bold:true,color:CHERRY,before:240,after:80}));
-    children.push(p("Sorted from most to least severe. Fix Critical issues first.",{size:20,italic:true,color:"595959",before:0,after:100}));
-    data.issues.forEach((issue,i)=>{
-      const bg=sevBg[issue.severity]||"F2F2F2";
-      const sc=sevColor[issue.severity]||BLACK;
-      const tbl=new Table({width:{size:9360,type:WidthType.DXA},columnWidths:[1600,7760],rows:[
-        new TableRow({children:[tc(`Issue ${i+1} of ${data.issues.length}`,"2E74B5",{bold:true,color:WHITE,w:1600}),
-          new TableCell({borders,shading:shade("2E74B5"),margins:{top:70,bottom:70,left:120,right:120},width:{size:7760,type:WidthType.DXA},
-            children:[cp(`[${issue.severity.toUpperCase()}]  ${issue.rule}`,{bold:true,color:WHITE})]})]}),
-        ...[ ["What",issue.description],["Where",issue.location],["How to fix",issue.howToFix],
-             ...(issue.wcagRef?[["WCAG ref",issue.wcagRef]]:[]) ]
-          .map(([lbl,val])=>new TableRow({children:[tc(lbl,"F2F2F2",{bold:true,w:1600}),
-            new TableCell({borders,shading:shade(bg),margins:{top:70,bottom:70,left:120,right:120},width:{size:7760,type:WidthType.DXA},children:[cp(val)]})]}))
-      ]});
-      children.push(tbl);
-      children.push(p("",{before:60,after:0}));
-    });
-  } else {
-    children.push(p("No Issues Found",{h:HeadingLevel.HEADING_1,size:28,bold:true,color:"2D6A4F",before:240,after:80}));
-    children.push(p("This file passes all automated accessibility checks.",{before:0,after:80}));
+    // Overview table
+    children.push(p("Overview",{h:HeadingLevel.HEADING_1,size:28,bold:true,color:CHERRY,before:160,after:80}));
+    const overviewRows = [
+      new TableRow({children:["File","Score","Grade","Critical","Major","Minor"].map(h=>tc(h,"1F4E79",{bold:true,color:WHITE}))}),
+      ...results.map(r => new TableRow({children:[
+        tc(r.fileName,"FFFFFF"),
+        tc(r.error?"—":String(r.score),"FFFFFF"),
+        tc(r.error?"Error":r.grade,"FFFFFF"),
+        tc(String(r.critical||0),"FFE0E0"),
+        tc(String(r.major||0),"FFF2CC"),
+        tc(String(r.minor||0),"EBF3FB"),
+      ]}))
+    ];
+    children.push(new Table({width:{size:9360,type:WidthType.DXA},columnWidths:[3360,1200,1800,1000,1000,1000],rows:overviewRows}));
+    children.push(p("",{before:160,after:0}));
+
+    // Combined totals
+    children.push(p("Combined Totals",{h:HeadingLevel.HEADING_1,size:28,bold:true,color:CHERRY,before:240,after:80}));
+    children.push(new Table({width:{size:9360,type:WidthType.DXA},columnWidths:[2340,2340,2340,2340],rows:[
+      new TableRow({children:["Critical issues","Major issues","Minor issues","Average score"].map(h=>tc(h,"1F4E79",{bold:true,color:WHITE}))}),
+      new TableRow({children:[
+        [String(agg.critical),"FFE0E0","9B1010"],
+        [String(agg.major),"FFF2CC","7A4A00"],
+        [String(agg.minor),"EBF3FB","1F4E79"],
+        [String(agg.avgScore),"E2EFDA","2D6A4F"],
+      ].map(([v,bg,c])=>new TableCell({borders,shading:shade(bg),margins:{top:70,bottom:70,left:120,right:120},children:[
+        new Paragraph({spacing:{before:60,after:60},children:[new TextRun({text:v,font:"Calibri",size:24,bold:true,color:c})]})
+      ]}))})
+    ]}));
+    children.push(p("",{before:160,after:0}));
+    children.push(p("Detailed Findings",{h:HeadingLevel.HEADING_1,size:28,bold:true,color:CHERRY,before:240,after:80}));
   }
+
+  // One section per file
+  results.forEach(data => {
+    if (multi) {
+      children.push(p(data.fileName,{h:HeadingLevel.HEADING_1,size:26,bold:true,color:BLUE,before:280,after:80}));
+    }
+
+    if (data.error) {
+      children.push(p(`This file could not be audited: ${data.error}`,{color:sevColor.critical,before:0,after:120}));
+      return;
+    }
+
+    // Meta table
+    children.push(new Table({width:{size:9360,type:WidthType.DXA},columnWidths:[1800,7560],rows:[
+      ["File",data.fileName,"F7F7F7"],
+      ["File type",data.fileType?.toUpperCase()||"","FFFFFF"],
+      ["Score",`${data.score} out of 100 — ${data.grade}`,sevBg[data.grade?.toLowerCase()]||"F2F2F2"],
+    ].map(([l,v,bg])=>new TableRow({children:[
+      tc(l,"1F4E79",{bold:true,color:WHITE,w:1800}),
+      new TableCell({borders,shading:shade(bg),margins:{top:70,bottom:70,left:120,right:120},width:{size:7560,type:WidthType.DXA},children:[cp(v,{bold:l==="Score",color:BLACK})]})
+    ]}))}));
+    children.push(p("",{before:120,after:0}));
+
+    // Per-file summary counts
+    children.push(new Table({width:{size:9360,type:WidthType.DXA},columnWidths:[2340,2340,2340,2340],rows:[
+      new TableRow({children:["Critical issues","Major issues","Minor issues","Checks passed"].map(h=>tc(h,"1F4E79",{bold:true,color:WHITE}))}),
+      new TableRow({children:[
+        [String(data.critical),"FFE0E0","9B1010"],
+        [String(data.major),"FFF2CC","7A4A00"],
+        [String(data.minor),"EBF3FB","1F4E79"],
+        [String(data.passed),"E2EFDA","2D6A4F"],
+      ].map(([v,bg,c])=>new TableCell({borders,shading:shade(bg),margins:{top:70,bottom:70,left:120,right:120},children:[
+        new Paragraph({spacing:{before:60,after:60},children:[new TextRun({text:v,font:"Calibri",size:24,bold:true,color:c})]})
+      ]}))})
+    ]}));
+    children.push(p("",{before:160,after:0}));
+
+    // Issues
+    if (data.issues?.length) {
+      children.push(p("Issues to Fix",{h:HeadingLevel.HEADING_1,size:24,bold:true,color:CHERRY,before:160,after:80}));
+      children.push(p("Sorted from most to least severe. Fix Critical issues first.",{size:20,italic:true,color:"595959",before:0,after:100}));
+      data.issues.forEach((issue,i)=>{
+        const bg=sevBg[issue.severity]||"F2F2F2";
+        const tbl=new Table({width:{size:9360,type:WidthType.DXA},columnWidths:[1600,7760],rows:[
+          new TableRow({children:[tc(`Issue ${i+1} of ${data.issues.length}`,"2E74B5",{bold:true,color:WHITE,w:1600}),
+            new TableCell({borders,shading:shade("2E74B5"),margins:{top:70,bottom:70,left:120,right:120},width:{size:7760,type:WidthType.DXA},
+              children:[cp(`[${issue.severity.toUpperCase()}]  ${issue.rule}`,{bold:true,color:WHITE})]})]}),
+          ...[ ["What",issue.description],["Where",issue.location],["How to fix",issue.howToFix],
+               ...(issue.wcagRef?[["WCAG ref",issue.wcagRef]]:[]) ]
+            .map(([lbl,val])=>new TableRow({children:[tc(lbl,"F2F2F2",{bold:true,w:1600}),
+              new TableCell({borders,shading:shade(bg),margins:{top:70,bottom:70,left:120,right:120},width:{size:7760,type:WidthType.DXA},children:[cp(val)]})]}))
+        ]});
+        children.push(tbl);
+        children.push(p("",{before:60,after:0}));
+      });
+    } else {
+      children.push(p("No Issues Found",{h:HeadingLevel.HEADING_1,size:24,bold:true,color:"2D6A4F",before:160,after:80}));
+      children.push(p("This file passes all automated accessibility checks.",{before:0,after:80}));
+    }
+  });
 
   // Footer
   children.push(new Paragraph({spacing:{before:240,after:0},border:{top:{style:BorderStyle.SINGLE,size:1,color:"CCCCCC"}},
     children:[new TextRun({text:"Generated by UNM CTL Accessibility Audit Tool  |  WCAG 2.2 AA  |  Section 508  |  UNM Online Learning Excellence Framework Element 11  |  This report is authored to meet WCAG 2.2 AA standards.",
       font:"Calibri",size:18,italic:true,color:"808080"})]}));
 
+  const titleStr = multi
+    ? `Accessibility Audit Report — ${results.length} files`
+    : `Accessibility Audit Report — ${results[0]?.fileName || ''}`;
+
   const document = new Document({
-    title:`Accessibility Audit Report — ${data.fileName}`,
+    title: titleStr,
     description:"WCAG 2.2 AA / Section 508 / UNM Framework Element 11 accessibility audit",
     styles:{
       default:{document:{run:{font:"Calibri",size:22,color:BLACK}}},
@@ -497,11 +684,17 @@ async function buildWordReport(data) {
 
 // ── Download ──
 function downloadReport() {
-  if(!reportBuffer) return;
-  const safeName = (auditData?.fileName||'document').replace(/[^a-zA-Z0-9._-]/g,'_');
+  if (!reportBuffer) return;
+  let safeName;
+  if (auditResults.length === 1) {
+    safeName = (auditResults[0]?.fileName || 'document').replace(/[^a-zA-Z0-9._-]/g,'_').replace(/\.[^.]+$/,'');
+    safeName += '_accessibility_report.docx';
+  } else {
+    safeName = `combined_accessibility_report_${auditResults.length}_files.docx`;
+  }
   const a=document.createElement('a');
   a.href=URL.createObjectURL(new Blob([reportBuffer],{type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'}));
-  a.download=safeName.replace(/\.[^.]+$/,'')+'_accessibility_report.docx';
+  a.download=safeName;
   a.click();
   URL.revokeObjectURL(a.href);
 }
