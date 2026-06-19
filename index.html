@@ -679,7 +679,7 @@ async function buildWordReport(results) {
     },
     sections:[{properties:{page:{margin:{top:1440,right:1440,bottom:1440,left:1440}}},children}]
   });
-  return await Packer.toBuffer(document);
+  return await Packer.toBlob(document);
 }
 
 // ── Download ──
