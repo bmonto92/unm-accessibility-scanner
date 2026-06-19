@@ -382,7 +382,7 @@ async function runAudit() {
       const ext = file.name.split('.').pop().toLowerCase();
       const fileType = ext === 'doc' ? 'docx' : ext === 'ppt' ? 'pptx' : ext;
 
-      const res = await fetch('/.netlify/functions/audit', {
+      const res = await fetch('/api/audit', {
         method: 'POST',
         headers: { 'Content-Type':'application/json' },
         body: JSON.stringify({ fileName: file.name, fileType, fileData: base64 })
