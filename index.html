@@ -244,6 +244,7 @@
 </footer>
 
 <script src="https://unpkg.com/docx@8.5.0/build/index.umd.js"></script>
+<script src="https://unpkg.com/jszip@3.10.1/dist/jszip.min.js"></script>
 <script>
 // ── State ──
 let uploadedFiles  = [];   // array of File objects
@@ -356,6 +357,52 @@ function updateLast(msg,type='done') {
   if(last) last.innerHTML=`<span class="s-dot ${type}"></span>${msg}`;
 }
 
+// ── Client-side extraction: pulls out only the XML text the audit engine
+// needs from a PPTX/DOCX, so embedded images/video/audio never get sent
+// to the server. This is what lets large files (bloated by media, not by
+// actual content) get scanned without hitting upload size limits. ──
+
+async function readZipText(zip, path) {
+  const entry = zip.file(path);
+  return entry ? await entry.async('text') : '';
+}
+
+async function extractDocxContent(file) {
+  const buf = await file.arrayBuffer();
+  const zip = await JSZip.loadAsync(buf);
+  return {
+    documentXml: await readZipText(zip, 'word/document.xml'),
+    stylesXml:   await readZipText(zip, 'word/styles.xml'),
+    settingsXml: await readZipText(zip, 'word/settings.xml'),
+    coreXml:     await readZipText(zip, 'docProps/core.xml'),
+    mediaFiles:  Object.keys(zip.files).filter(f => /word\/media\//.test(f)),
+  };
+}
+
+async function extractPptxContent(file) {
+  const buf = await file.arrayBuffer();
+  const zip = await JSZip.loadAsync(buf);
+
+  const slidePaths = Object.keys(zip.files)
+    .filter(f => /^ppt\/slides\/slide\d+\.xml$/.test(f))
+    .sort((a, b) => parseInt(a.match(/slide(\d+)/)[1]) - parseInt(b.match(/slide(\d+)/)[1]));
+
+  const slides = [];
+  for (const path of slidePaths) {
+    const num = parseInt(path.match(/slide(\d+)/)[1]);
+    const xml = await readZipText(zip, path);
+    const notesXml = await readZipText(zip, `ppt/notesSlides/notesSlide${num}.xml`);
+    slides.push({ num, xml, notesXml: notesXml || null });
+  }
+  return { slides };
+}
+
+// PDFs still need their raw bytes sent to the server (pdf-parse needs the
+// actual binary), so they remain subject to Vercel's ~4.5MB request body
+// limit. Guard against that here with a clear, actionable message instead
+// of a raw "Server error 413".
+const PDF_SIZE_LIMIT = 3.5 * 1024 * 1024; // ~3.5MB raw, leaves room for base64 inflation
+
 // ── Run audit (loops the existing single-file function across all loaded files) ──
 async function runAudit() {
   if (!uploadedFiles.length) return;
@@ -371,20 +418,43 @@ async function runAudit() {
     addStatus(`Auditing ${file.name} (${i+1} of ${total})…`);
 
     try {
-      const base64 = await new Promise((res, rej) => {
-        const reader = new FileReader();
-        reader.onload  = () => res(reader.result.split(',')[1]);
-        reader.onerror = () => rej(new Error('Could not read file'));
-        reader.readAsDataURL(file);
-      });
-
       const ext = file.name.split('.').pop().toLowerCase();
       const fileType = ext === 'doc' ? 'docx' : ext === 'ppt' ? 'pptx' : ext;
+
+      let requestBody;
+
+      if (fileType === 'docx' || fileType === 'pptx') {
+        // Extract only the XML text the audit needs — embedded images/video
+        // never leave the browser, so large decks/docs upload fine.
+        const extracted = fileType === 'docx'
+          ? await extractDocxContent(file)
+          : await extractPptxContent(file);
+        requestBody = { fileName: file.name, fileType, extracted };
+
+      } else if (fileType === 'pdf') {
+        if (file.size > PDF_SIZE_LIMIT) {
+          throw new Error(
+            `File is too large to scan (${(file.size / 1024 / 1024).toFixed(1)}MB, limit ~3.5MB). ` +
+            `To fix: in Acrobat, use File → Save As Other → Reduced Size PDF, or re-export ` +
+            `from the source document with images compressed.`
+          );
+        }
+        const base64 = await new Promise((res, rej) => {
+          const reader = new FileReader();
+          reader.onload  = () => res(reader.result.split(',')[1]);
+          reader.onerror = () => rej(new Error('Could not read file'));
+          reader.readAsDataURL(file);
+        });
+        requestBody = { fileName: file.name, fileType, fileData: base64 };
+
+      } else {
+        throw new Error(`Unsupported file type: ${fileType}`);
+      }
 
       const res = await fetch('/api/audit', {
         method: 'POST',
         headers: { 'Content-Type':'application/json' },
-        body: JSON.stringify({ fileName: file.name, fileType, fileData: base64 })
+        body: JSON.stringify(requestBody)
       });
 
       if (!res.ok) {
