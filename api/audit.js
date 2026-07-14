@@ -1,8 +1,9 @@
 // UNM Accessibility Audit Engine — Vercel Serverless Function
 // Mirrors the Python audit_engine.py logic for PDF, DOCX, and PPTX files
-// Libraries used: pdf-parse (PDF), mammoth (DOCX text), jszip (PPTX/DOCX XML parsing)
+// Libraries used: pdf-parse (PDF). DOCX/PPTX arrive pre-extracted from the
+// browser (JSZip runs client-side) so this function never sees embedded
+// images/video/audio — only the small XML text it actually needs.
 
-const JSZip    = require('jszip');
 const pdfParse = require('pdf-parse');
 const mammoth  = require('mammoth');
 
@@ -145,22 +146,19 @@ async function auditPDF(buffer, fileName) {
 // ─────────────────────────────────────────────
 // DOCX Auditor
 // ─────────────────────────────────────────────
-async function auditDOCX(buffer, fileName) {
+async function auditDOCX(extracted, fileName) {
   const result = makeResult(fileName, 'docx');
-  let zip;
 
-  try {
-    zip = await JSZip.loadAsync(buffer);
-  } catch(e) {
-    result.addIssue('critical','unreadable-file',`Could not open Word document: ${e.message}`,'file',
+  if (!extracted || !extracted.documentXml) {
+    result.addIssue('critical','unreadable-file','Could not read Word document content.','file',
       'Ensure the file is a valid .docx file.','WCAG 1.1.1');
     return result;
   }
 
-  const docXmlRaw  = await zip.file('word/document.xml')?.async('text') || '';
-  const stylesXml  = await zip.file('word/styles.xml')?.async('text')   || '';
-  const settingsXml= await zip.file('word/settings.xml')?.async('text') || '';
-  const coreXml    = await zip.file('docProps/core.xml')?.async('text') || '';
+  const docXmlRaw   = extracted.documentXml || '';
+  const stylesXml   = extracted.stylesXml   || '';
+  const settingsXml = extracted.settingsXml || '';
+  const coreXml     = extracted.coreXml     || '';
 
   const titleMatch = coreXml.match(/<dc:title>([^<]+)<\/dc:title>/);
   if (!titleMatch || !titleMatch[1].trim()) {
@@ -203,7 +201,7 @@ async function auditDOCX(buffer, fileName) {
     }
   }
 
-  const imageRels = Object.keys(zip.files).filter(f => f.match(/word\/media\//));
+  const imageRels = extracted.mediaFiles || [];
   const docPrMatches = docXmlRaw.match(/<wp:docPr[^>]*>/g) || [];
   const missingAlt = docPrMatches.filter(m => !m.includes('descr=') || m.match(/descr=""/));
 
@@ -283,25 +281,16 @@ async function auditDOCX(buffer, fileName) {
 // ─────────────────────────────────────────────
 // PPTX Auditor
 // ─────────────────────────────────────────────
-async function auditPPTX(buffer, fileName) {
+async function auditPPTX(extracted, fileName) {
   const result = makeResult(fileName, 'pptx');
-  let zip;
 
-  try {
-    zip = await JSZip.loadAsync(buffer);
-  } catch(e) {
-    result.addIssue('critical','unreadable-file',`Could not open PowerPoint: ${e.message}`,'file',
+  if (!extracted || !Array.isArray(extracted.slides)) {
+    result.addIssue('critical','unreadable-file','Could not read PowerPoint content.','file',
       'Ensure the file is a valid .pptx file.','WCAG 1.1.1');
     return result;
   }
 
-  const slideFiles = Object.keys(zip.files)
-    .filter(f => f.match(/^ppt\/slides\/slide\d+\.xml$/))
-    .sort((a,b) => {
-      const na = parseInt(a.match(/slide(\d+)/)[1]);
-      const nb = parseInt(b.match(/slide(\d+)/)[1]);
-      return na - nb;
-    });
+  const slideFiles = extracted.slides; // [{ num, xml, notesXml }, ...], already sorted by slide number
 
   const totalSlides = slideFiles.length;
   if (totalSlides === 0) {
@@ -323,8 +312,8 @@ async function auditPPTX(buffer, fileName) {
   const titlesSeen           = {};
 
   for (let i = 0; i < slideFiles.length; i++) {
-    const slideNum = i + 1;
-    const slideXml = await zip.file(slideFiles[i])?.async('text') || '';
+    const slideNum = slideFiles[i].num;
+    const slideXml = slideFiles[i].xml || '';
 
     const titlePlaceholders = slideXml.match(/<p:ph[^>]*type="(?:title|ctrTitle)"[^>]*\/?>/g) || [];
     let titleText = '';
@@ -363,10 +352,9 @@ async function auditPPTX(buffer, fileName) {
       }
     }
 
-    const slideNotesPath = `ppt/notesSlides/notesSlide${slideNum}.xml`;
-    const hasNotes = zip.files[slideNotesPath] !== undefined;
+    const hasNotes = !!slideFiles[i].notesXml;
     if (hasNotes) {
-      const notesXml = await zip.file(slideNotesPath)?.async('text') || '';
+      const notesXml = slideFiles[i].notesXml || '';
       const notesText = (notesXml.match(/<a:t>([^<]*)<\/a:t>/g) || [])
         .map(t=>t.replace(/<[^>]+>/g,'')).join(' ').trim();
       const shapeCount = (slideXml.match(/<p:sp>/g) || []).length;
@@ -495,6 +483,11 @@ async function auditPPTX(buffer, fileName) {
 // ─────────────────────────────────────────────
 // Vercel serverless handler
 // (req.body is auto-parsed JSON by Vercel when Content-Type: application/json)
+//
+// DOCX/PPTX: browser sends pre-extracted XML text (via `extracted`), not the
+// raw file — this keeps the request body tiny regardless of embedded media.
+// PDF: browser still sends the raw base64 file (via `fileData`), since text
+// extraction there requires the actual PDF bytes.
 // ─────────────────────────────────────────────
 module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -512,20 +505,29 @@ module.exports = async (req, res) => {
   }
 
   try {
-    const { fileName, fileType, fileData } = req.body || {};
+    const { fileName, fileType, fileData, extracted } = req.body || {};
 
-    if (!fileData || !fileName || !fileType) {
+    if (!fileName || !fileType) {
       res.status(400).json({ error: 'Missing file data' });
       return;
     }
 
-    const buffer = Buffer.from(fileData, 'base64');
     let result;
 
-    if      (fileType === 'pdf')  result = await auditPDF(buffer, fileName);
-    else if (fileType === 'docx') result = await auditDOCX(buffer, fileName);
-    else if (fileType === 'pptx') result = await auditPPTX(buffer, fileName);
-    else { res.status(400).json({ error: `Unsupported file type: ${fileType}` }); return; }
+    if (fileType === 'pdf') {
+      if (!fileData) { res.status(400).json({ error: 'Missing file data' }); return; }
+      const buffer = Buffer.from(fileData, 'base64');
+      result = await auditPDF(buffer, fileName);
+    } else if (fileType === 'docx') {
+      if (!extracted) { res.status(400).json({ error: 'Missing extracted content' }); return; }
+      result = await auditDOCX(extracted, fileName);
+    } else if (fileType === 'pptx') {
+      if (!extracted) { res.status(400).json({ error: 'Missing extracted content' }); return; }
+      result = await auditPPTX(extracted, fileName);
+    } else {
+      res.status(400).json({ error: `Unsupported file type: ${fileType}` });
+      return;
+    }
 
     res.status(200).json(result.summary());
 
