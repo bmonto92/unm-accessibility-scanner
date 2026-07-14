@@ -1,8 +1,9 @@
-// UNM Accessibility Audit Engine — Node.js / Netlify Functions
+// UNM Accessibility Audit Engine — Vercel Serverless Function
 // Mirrors the Python audit_engine.py logic for PDF, DOCX, and PPTX files
-// Libraries used: pdf-parse (PDF), mammoth (DOCX text), jszip (PPTX/DOCX XML parsing)
+// Libraries used: pdf-parse (PDF). DOCX/PPTX arrive pre-extracted from the
+// browser (JSZip runs client-side) so this function never sees embedded
+// images/video/audio — only the small XML text it actually needs.
 
-const JSZip    = require('jszip');
 const pdfParse = require('pdf-parse');
 const mammoth  = require('mammoth');
 
@@ -76,7 +77,6 @@ async function auditPDF(buffer, fileName) {
     return result;
   }
 
-  // ── 1. Text extractability (scanned/image-only) ──
   const text = data.text || '';
   const wordCount = text.trim().split(/\s+/).filter(Boolean).length;
   const pageCount = data.numpages || 1;
@@ -92,7 +92,6 @@ async function auditPDF(buffer, fileName) {
     result.addPass(`Text is extractable (avg ${Math.round(wordsPerPage)} words/page)`);
   }
 
-  // ── 2. Check for metadata via raw PDF inspection ──
   const info = data.info || {};
   if (!info.Title || !info.Title.trim()) {
     result.addIssue('major','missing-title-metadata','PDF has no Title in document properties.','document metadata',
@@ -102,7 +101,6 @@ async function auditPDF(buffer, fileName) {
     result.addPass(`Document title set: "${info.Title}"`);
   }
 
-  // ── 3. Language ──
   if (!info.Language && !info.Lang) {
     result.addIssue('major','missing-language','PDF language is not set — screen readers may mispronounce content.','document metadata',
       'In Acrobat: File → Properties → Advanced → Reading Options → Language. Set to "en-US".',
@@ -111,7 +109,6 @@ async function auditPDF(buffer, fileName) {
     result.addPass('Document language is set');
   }
 
-  // ── 4. Link text quality (scan raw text for common bad patterns) ──
   const clickHereMatches = (text.match(/click here|read more|learn more/gi) || []).length;
   if (clickHereMatches > 0) {
     result.addIssue('major','non-descriptive-link-text',
@@ -123,7 +120,6 @@ async function auditPDF(buffer, fileName) {
     result.addPass('No obvious non-descriptive link text found');
   }
 
-  // ── 5. Heading structure (heuristic via text patterns) ──
   const lines = text.split('\n').filter(l => l.trim());
   const shortUpperLines = lines.filter(l => l.trim().length < 60 && l.trim() === l.trim().toUpperCase() && l.trim().length > 3);
   if (shortUpperLines.length === 0) {
@@ -136,14 +132,12 @@ async function auditPDF(buffer, fileName) {
     result.addPass('Document appears to have heading-like structure');
   }
 
-  // ── 6. Reading order (manual check flag) ──
   result.addIssue('minor','verify-reading-order',
     'Reading order and tab order cannot be fully verified programmatically — manual check recommended.',
     'entire document',
     'In Acrobat Pro: Tools → Accessibility → Reading Order → verify the numbered order matches the visual layout. Also run Full Check.',
     'WCAG 1.3.2');
 
-  // ── 7. Page count context ──
   result.addPass(`Document has ${pageCount} page(s) — text extraction successful`);
 
   return result;
@@ -152,25 +146,20 @@ async function auditPDF(buffer, fileName) {
 // ─────────────────────────────────────────────
 // DOCX Auditor
 // ─────────────────────────────────────────────
-async function auditDOCX(buffer, fileName) {
+async function auditDOCX(extracted, fileName) {
   const result = makeResult(fileName, 'docx');
-  let zip;
 
-  try {
-    zip = await JSZip.loadAsync(buffer);
-  } catch(e) {
-    result.addIssue('critical','unreadable-file',`Could not open Word document: ${e.message}`,'file',
+  if (!extracted || !extracted.documentXml) {
+    result.addIssue('critical','unreadable-file','Could not read Word document content.','file',
       'Ensure the file is a valid .docx file.','WCAG 1.1.1');
     return result;
   }
 
-  // ── Extract document.xml ──
-  const docXmlRaw  = await zip.file('word/document.xml')?.async('text') || '';
-  const stylesXml  = await zip.file('word/styles.xml')?.async('text')   || '';
-  const settingsXml= await zip.file('word/settings.xml')?.async('text') || '';
-  const coreXml    = await zip.file('docProps/core.xml')?.async('text') || '';
+  const docXmlRaw   = extracted.documentXml || '';
+  const stylesXml   = extracted.stylesXml   || '';
+  const settingsXml = extracted.settingsXml || '';
+  const coreXml     = extracted.coreXml     || '';
 
-  // ── 1. Document title ──
   const titleMatch = coreXml.match(/<dc:title>([^<]+)<\/dc:title>/);
   if (!titleMatch || !titleMatch[1].trim()) {
     result.addIssue('major','missing-title-metadata','Document Title property is not set.','document properties',
@@ -179,7 +168,6 @@ async function auditDOCX(buffer, fileName) {
     result.addPass(`Document title set: "${titleMatch[1]}"`);
   }
 
-  // ── 2. Language ──
   const langInSettings = settingsXml.includes('w:lang') || stylesXml.includes('w:lang');
   if (!langInSettings) {
     result.addIssue('minor','missing-language','Document language may not be explicitly set.',
@@ -188,10 +176,6 @@ async function auditDOCX(buffer, fileName) {
     result.addPass('Document language is set');
   }
 
-  // ── 3. Heading structure ──
-  const headingMatches = docXmlRaw.match(/w:styleId="Heading(\d)"/g) || 
-                         docXmlRaw.match(/<w:pStyle w:val="Heading(\d)"\/>/g) || [];
-  // Also check for heading style references in paragraph properties
   const headingRefs = (docXmlRaw.match(/<w:pStyle w:val="Heading\d"/g) || []);
 
   if (headingRefs.length === 0) {
@@ -201,7 +185,6 @@ async function auditDOCX(buffer, fileName) {
       'Use Word\'s built-in Heading 1, Heading 2 styles (Home tab → Styles). Never simulate headings with bold/large text.',
       'WCAG 1.3.1');
   } else {
-    // Check for skipped heading levels
     const levels = headingRefs.map(m => parseInt(m.match(/Heading(\d)/)[1])).sort((a,b)=>a-b);
     const skipped = [];
     for (let i = 1; i < levels.length; i++) {
@@ -218,8 +201,7 @@ async function auditDOCX(buffer, fileName) {
     }
   }
 
-  // ── 4. Images and alt text ──
-  const imageRels = Object.keys(zip.files).filter(f => f.match(/word\/media\//));
+  const imageRels = extracted.mediaFiles || [];
   const docPrMatches = docXmlRaw.match(/<wp:docPr[^>]*>/g) || [];
   const missingAlt = docPrMatches.filter(m => !m.includes('descr=') || m.match(/descr=""/));
 
@@ -237,7 +219,6 @@ async function auditDOCX(buffer, fileName) {
     result.addPass('No images detected requiring alt text');
   }
 
-  // ── 5. Tables — header rows ──
   const tableCount = (docXmlRaw.match(/<w:tbl>/g) || []).length;
   const headerRowCount = (docXmlRaw.match(/<w:tblHeader\/>/g) || []).length;
   if (tableCount > 0) {
@@ -253,7 +234,6 @@ async function auditDOCX(buffer, fileName) {
     }
   }
 
-  // ── 6. Link text quality ──
   const hyperlinkTexts = [];
   const hlRegex = /<w:hyperlink[^>]*>([\s\S]*?)<\/w:hyperlink>/g;
   let hlMatch;
@@ -272,9 +252,7 @@ async function auditDOCX(buffer, fileName) {
     result.addPass('All hyperlinks use descriptive text');
   }
 
-  // ── 7. Color as sole means ──
   const coloredRuns = (docXmlRaw.match(/<w:color w:val="(?!auto|000000|FFFFFF)[A-Fa-f0-9]{6}"\/>/g) || []).length;
-  // Exclude heading paragraphs (rough heuristic: count outside heading context)
   if (coloredRuns > 8) {
     result.addIssue('minor','color-only-formatting',
       `Document uses colored text in ${coloredRuns} places — verify color is not the only way meaning is conveyed.`,
@@ -285,7 +263,6 @@ async function auditDOCX(buffer, fileName) {
     result.addPass('Color use appears supplementary to other formatting');
   }
 
-  // ── 8. Blank paragraphs ──
   const blankParas = (docXmlRaw.match(/<w:p><\/w:p>|<w:p\/>/g) || []).length +
                      (docXmlRaw.match(/<w:p><w:pPr><w:pStyle w:val="Normal"\/><\/w:pPr><\/w:p>/g) || []).length;
   if (blankParas > 8) {
@@ -304,26 +281,16 @@ async function auditDOCX(buffer, fileName) {
 // ─────────────────────────────────────────────
 // PPTX Auditor
 // ─────────────────────────────────────────────
-async function auditPPTX(buffer, fileName) {
+async function auditPPTX(extracted, fileName) {
   const result = makeResult(fileName, 'pptx');
-  let zip;
 
-  try {
-    zip = await JSZip.loadAsync(buffer);
-  } catch(e) {
-    result.addIssue('critical','unreadable-file',`Could not open PowerPoint: ${e.message}`,'file',
+  if (!extracted || !Array.isArray(extracted.slides)) {
+    result.addIssue('critical','unreadable-file','Could not read PowerPoint content.','file',
       'Ensure the file is a valid .pptx file.','WCAG 1.1.1');
     return result;
   }
 
-  // Find all slide files
-  const slideFiles = Object.keys(zip.files)
-    .filter(f => f.match(/^ppt\/slides\/slide\d+\.xml$/))
-    .sort((a,b) => {
-      const na = parseInt(a.match(/slide(\d+)/)[1]);
-      const nb = parseInt(b.match(/slide(\d+)/)[1]);
-      return na - nb;
-    });
+  const slideFiles = extracted.slides; // [{ num, xml, notesXml }, ...], already sorted by slide number
 
   const totalSlides = slideFiles.length;
   if (totalSlides === 0) {
@@ -345,15 +312,12 @@ async function auditPPTX(buffer, fileName) {
   const titlesSeen           = {};
 
   for (let i = 0; i < slideFiles.length; i++) {
-    const slideNum = i + 1;
-    const slideXml = await zip.file(slideFiles[i])?.async('text') || '';
+    const slideNum = slideFiles[i].num;
+    const slideXml = slideFiles[i].xml || '';
 
-    // ── Slide title ──
-    // Title placeholder is ph type="title" or ph type="ctrTitle"
     const titlePlaceholders = slideXml.match(/<p:ph[^>]*type="(?:title|ctrTitle)"[^>]*\/?>/g) || [];
     let titleText = '';
     if (titlePlaceholders.length > 0) {
-      // Find the sp element containing a title ph and extract its text
       const spBlocks = slideXml.match(/<p:sp>[\s\S]*?<\/p:sp>/g) || [];
       for (const sp of spBlocks) {
         if (sp.includes('type="title"') || sp.includes('type="ctrTitle"')) {
@@ -374,10 +338,7 @@ async function auditPPTX(buffer, fileName) {
       titlesSeen[tLower] = true;
     }
 
-    // ── Alt text on images and shapes ──
-    // Look for pic or sp elements — check nvPr descr attribute
-    const nvPrMatches = slideXml.match(/<p:nvPr>[\s\S]*?<\/p:nvPr>/g) || [];
-    const picBlocks   = slideXml.match(/<p:pic>[\s\S]*?<\/p:pic>/g) || [];
+    const picBlocks = slideXml.match(/<p:pic>[\s\S]*?<\/p:pic>/g) || [];
 
     for (const pic of picBlocks) {
       const cNvPr = pic.match(/<p:cNvPr[^>]*>/);
@@ -391,11 +352,9 @@ async function auditPPTX(buffer, fileName) {
       }
     }
 
-    // ── Speaker notes ──
-    const slideNotesPath = `ppt/notesSlides/notesSlide${slideNum}.xml`;
-    const hasNotes = zip.files[slideNotesPath] !== undefined;
+    const hasNotes = !!slideFiles[i].notesXml;
     if (hasNotes) {
-      const notesXml = await zip.file(slideNotesPath)?.async('text') || '';
+      const notesXml = slideFiles[i].notesXml || '';
       const notesText = (notesXml.match(/<a:t>([^<]*)<\/a:t>/g) || [])
         .map(t=>t.replace(/<[^>]+>/g,'')).join(' ').trim();
       const shapeCount = (slideXml.match(/<p:sp>/g) || []).length;
@@ -407,7 +366,6 @@ async function auditPPTX(buffer, fileName) {
       if (shapeCount > 3) slidesNeedingNotes.push(slideNum);
     }
 
-    // ── Color contrast (text runs with explicit colors) ──
     const runMatches = slideXml.match(/<a:r>[\s\S]*?<\/a:r>/g) || [];
     for (const run of runMatches) {
       const textMatch = run.match(/<a:t>([^<]+)<\/a:t>/);
@@ -415,7 +373,7 @@ async function auditPPTX(buffer, fileName) {
       const solidFill = run.match(/<a:solidFill>[\s\S]*?<a:srgbClr val="([A-Fa-f0-9]{6})"[\s\S]*?<\/a:solidFill>/);
       if (solidFill) {
         const fg = hexToRgb(solidFill[1]);
-        const bg = [255, 255, 255]; // assume white bg
+        const bg = [255, 255, 255];
         if (fg && !passesContrastAA(fg, bg)) {
           const ratio = Math.round(contrastRatio(fg, bg) * 10) / 10;
           contrastIssues.push(`Slide ${slideNum}: "${textMatch[1].slice(0,30)}" — ratio ${ratio}:1`);
@@ -423,14 +381,10 @@ async function auditPPTX(buffer, fileName) {
       }
     }
 
-    // ── Animations ──
     if (slideXml.includes('<p:timing>') && slideXml.includes('<p:seq>')) {
       animatedSlides.push(slideNum);
     }
 
-    // ── Hyperlink text ──
-    const hlMatches = slideXml.match(/<a:hlinkClick[^>]*>|<a:r>[^<]*<a:rPr[^>]*>[\s\S]*?<a:hlinkClick/g) || [];
-    // Simpler: find rPr with hlinkClick and get the preceding a:t
     const rBlocks = slideXml.match(/<a:r>[\s\S]*?<\/a:r>/g) || [];
     for (const r of rBlocks) {
       if (r.includes('hlinkClick') || r.includes('r:id')) {
@@ -439,13 +393,11 @@ async function auditPPTX(buffer, fileName) {
       }
     }
 
-    // ── Embedded media ──
     if (slideXml.includes('<p:video>') || slideXml.includes('<p:audio>') || slideXml.includes('audio/') || slideXml.includes('video/')) {
       mediaSlides.push(slideNum);
     }
   }
 
-  // ── Report issues ──
   if (slidesMissingTitles.length > 0) {
     result.addIssue('critical','slides-missing-titles',
       `${slidesMissingTitles.length} slide(s) have no title: slides ${slidesMissingTitles.slice(0,10).join(', ')}${slidesMissingTitles.length > 10 ? '...' : ''}`,
@@ -519,7 +471,6 @@ async function auditPPTX(buffer, fileName) {
       'WCAG 1.2.2');
   }
 
-  // ── Reading order flag ──
   result.addIssue('major','verify-reading-order',
     'Reading order must be manually verified for slides with multiple overlapping shapes.',
     'all slides',
@@ -530,48 +481,58 @@ async function auditPPTX(buffer, fileName) {
 }
 
 // ─────────────────────────────────────────────
-// Netlify handler
+// Vercel serverless handler
+// (req.body is auto-parsed JSON by Vercel when Content-Type: application/json)
+//
+// DOCX/PPTX: browser sends pre-extracted XML text (via `extracted`), not the
+// raw file — this keeps the request body tiny regardless of embedded media.
+// PDF: browser still sends the raw base64 file (via `fileData`), since text
+// extraction there requires the actual PDF bytes.
 // ─────────────────────────────────────────────
-exports.handler = async (event) => {
-  if (event.httpMethod !== 'POST') {
-    return { statusCode: 405, body: JSON.stringify({ error: 'Method not allowed' }) };
+module.exports = async (req, res) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+
+  if (req.method === 'OPTIONS') {
+    res.status(200).end();
+    return;
   }
 
-  const headers = {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'Content-Type',
-    'Content-Type': 'application/json',
-  };
+  if (req.method !== 'POST') {
+    res.status(405).json({ error: 'Method not allowed' });
+    return;
+  }
 
   try {
-    const body = JSON.parse(event.body);
-    const { fileName, fileType, fileData } = body;
+    const { fileName, fileType, fileData, extracted } = req.body || {};
 
-    if (!fileData || !fileName || !fileType) {
-      return { statusCode: 400, headers, body: JSON.stringify({ error: 'Missing file data' }) };
+    if (!fileName || !fileType) {
+      res.status(400).json({ error: 'Missing file data' });
+      return;
     }
 
-    // Decode base64 file
-    const buffer = Buffer.from(fileData, 'base64');
     let result;
 
-    if      (fileType === 'pdf')  result = await auditPDF(buffer, fileName);
-    else if (fileType === 'docx') result = await auditDOCX(buffer, fileName);
-    else if (fileType === 'pptx') result = await auditPPTX(buffer, fileName);
-    else return { statusCode: 400, headers, body: JSON.stringify({ error: `Unsupported file type: ${fileType}` }) };
+    if (fileType === 'pdf') {
+      if (!fileData) { res.status(400).json({ error: 'Missing file data' }); return; }
+      const buffer = Buffer.from(fileData, 'base64');
+      result = await auditPDF(buffer, fileName);
+    } else if (fileType === 'docx') {
+      if (!extracted) { res.status(400).json({ error: 'Missing extracted content' }); return; }
+      result = await auditDOCX(extracted, fileName);
+    } else if (fileType === 'pptx') {
+      if (!extracted) { res.status(400).json({ error: 'Missing extracted content' }); return; }
+      result = await auditPPTX(extracted, fileName);
+    } else {
+      res.status(400).json({ error: `Unsupported file type: ${fileType}` });
+      return;
+    }
 
-    return {
-      statusCode: 200,
-      headers,
-      body: JSON.stringify(result.summary()),
-    };
+    res.status(200).json(result.summary());
 
-  } catch(err) {
+  } catch (err) {
     console.error('Audit error:', err);
-    return {
-      statusCode: 500,
-      headers,
-      body: JSON.stringify({ error: err.message }),
-    };
+    res.status(500).json({ error: err.message });
   }
 };
