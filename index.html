@@ -89,13 +89,12 @@
   /* Per-file breakdown table (multi-file only) */
   .breakdown-section { display:none; margin-top:18px; }
   .breakdown-section.visible { display:block; }
-  .breakdown-head, .breakdown-row { display:grid; grid-template-columns:1fr 64px 100px 1fr; gap:10px; align-items:center; padding:9px 4px; }
+  .breakdown-head, .breakdown-row { display:grid; grid-template-columns:1fr 64px 1fr; gap:10px; align-items:center; padding:9px 4px; }
   .breakdown-head { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; color:var(--ink-l); border-bottom:1.5px solid var(--border); padding-bottom:8px; }
   .breakdown-row { font-size:13px; border-bottom:0.5px solid var(--border); }
   .breakdown-row:last-child { border-bottom:none; }
   .bd-name { font-weight:600; color:var(--ink); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .bd-score { font-weight:700; color:var(--cherry-d); }
-  .bd-grade { color:var(--ink-m); }
   .bd-issues { color:var(--ink-l); font-size:12px; }
 
   /* Issues list */
@@ -106,7 +105,7 @@
 
   .file-group-heading { display:flex; justify-content:space-between; align-items:baseline; gap:10px; margin:24px 0 10px; padding-bottom:6px; border-bottom:2px solid var(--cherry-l); flex-wrap:wrap; }
   .file-group-heading .fgh-name { font-family:'Playfair Display',serif; font-size:16px; color:var(--cherry-d); font-weight:700; }
-  .file-group-heading .fgh-score { font-size:12px; color:var(--ink-l); }
+  .file-group-heading .fgh-issues { font-size:12px; color:var(--ink-l); }
 
   .issue-card { border:1.5px solid var(--border); border-radius:8px; overflow:hidden; margin-bottom:12px; }
   .issue-header { display:grid; grid-template-columns:auto 1fr; align-items:center; gap:0; }
@@ -136,7 +135,7 @@
     .issue-body{grid-template-columns:1fr;}
     .score-banner.visible{flex-direction:column; align-items:flex-start;}
     .score-counts{margin-left:0;}
-    .breakdown-head, .breakdown-row{grid-template-columns:1fr 50px 80px;}
+    .breakdown-head, .breakdown-row{grid-template-columns:1fr 50px;}
     .bd-issues{display:none;}
   }
 </style>
@@ -199,12 +198,11 @@
   <!-- Status log -->
   <div class="status-box" id="status-box" aria-live="polite" aria-label="Audit progress"></div>
 
-  <!-- Score banner -->
-  <div class="score-banner" id="score-banner" role="region" aria-label="Audit score">
+  <!-- Issue summary banner -->
+  <div class="score-banner" id="score-banner" role="region" aria-label="Audit issue summary">
     <div>
-      <div class="score-label" id="score-label-text">Accessibility score</div>
+      <div class="score-label" id="score-label-text">Issues found</div>
       <div class="score-num" id="score-num">—</div>
-      <div class="score-grade" id="score-grade">—</div>
     </div>
     <div class="score-counts">
       <div class="count-pill"><span class="count-num" id="cnt-critical">0</span><span class="count-lbl">Critical</span></div>
@@ -219,7 +217,7 @@
     <div class="card">
       <div class="card-title">📋 Per-File Breakdown</div>
       <div class="breakdown-head">
-        <span>File</span><span>Score</span><span>Grade</span><span>Issues</span>
+        <span>File</span><span>Issues</span><span>Breakdown</span>
       </div>
       <div id="breakdown-body"></div>
     </div>
@@ -464,11 +462,11 @@ async function runAudit() {
 
       const summary = await res.json();
       auditResults.push(summary);
-      updateLast(`${file.name} — score ${summary.score} (${summary.total} issue${summary.total !== 1 ? 's' : ''}) ✓`, 'done');
+      updateLast(`${file.name} — ${summary.total} issue${summary.total !== 1 ? 's' : ''} found ✓`, 'done');
 
     } catch (err) {
       auditResults.push({
-        fileName: file.name, fileType: '', score: 0, grade: 'Error',
+        fileName: file.name, fileType: '',
         critical: 0, major: 0, minor: 0, total: 0, passed: 0, issues: [],
         error: err.message
       });
@@ -492,30 +490,26 @@ async function runAudit() {
 
 // ── Aggregate stats across all files ──
 function aggregate(results) {
-  const valid = results.filter(r => !r.error);
   const critical = results.reduce((s,r)=>s+(r.critical||0),0);
   const major    = results.reduce((s,r)=>s+(r.major||0),0);
   const minor    = results.reduce((s,r)=>s+(r.minor||0),0);
   const passed   = results.reduce((s,r)=>s+(r.passed||0),0);
-  const avgScore = valid.length ? Math.round((valid.reduce((s,r)=>s+r.score,0)/valid.length)*10)/10 : 0;
-  const grade = avgScore===100?'Perfect':avgScore>=80?'Good':avgScore>=60?'Needs work':avgScore>=40?'Poor':'Critical';
-  return { critical, major, minor, passed, avgScore, grade };
+  const total    = results.reduce((s,r)=>s+(r.total||0),0);
+  return { critical, major, minor, passed, total };
 }
 
 // ── Render results in page ──
 function renderResults(results) {
   const multi = results.length > 1;
   const agg = aggregate(results);
-  const gradeBg = {Perfect:'#1A6B2F',Good:'#1A6B2F','Needs work':'#7A4A00',Poor:'#9B1010',Critical:'#9B1010'};
+  const bannerBg = agg.critical > 0 ? '#9B1010' : agg.major > 0 ? '#7A4A00' : agg.minor > 0 ? '#1F4E79' : '#1A6B2F';
 
-  // Score banner
+  // Issue summary banner
   const banner = document.getElementById('score-banner');
-  const gradeKey = multi ? agg.grade : (results[0]?.grade || '—');
-  banner.style.background = gradeBg[gradeKey] || '#595959';
+  banner.style.background = bannerBg;
   banner.classList.add('visible');
-  document.getElementById('score-label-text').textContent = multi ? 'Average accessibility score' : 'Accessibility score';
-  document.getElementById('score-num').textContent   = multi ? agg.avgScore : (results[0]?.score ?? '—');
-  document.getElementById('score-grade').textContent = multi ? agg.grade : (results[0]?.grade ?? '—');
+  document.getElementById('score-label-text').textContent = multi ? 'Total issues found' : 'Issues found';
+  document.getElementById('score-num').textContent    = agg.total;
   document.getElementById('cnt-critical').textContent = agg.critical;
   document.getElementById('cnt-major').textContent    = agg.major;
   document.getElementById('cnt-minor').textContent    = agg.minor;
@@ -531,9 +525,8 @@ function renderResults(results) {
       row.className = 'breakdown-row';
       row.innerHTML = `
         <span class="bd-name">${r.fileName}</span>
-        <span class="bd-score">${r.error ? '—' : r.score}</span>
-        <span class="bd-grade">${r.error ? 'Error' : r.grade}</span>
-        <span class="bd-issues">${r.error ? r.error : `${r.total} issue${r.total !== 1 ? 's' : ''}`}</span>`;
+        <span class="bd-score">${r.error ? '—' : r.total}</span>
+        <span class="bd-issues">${r.error ? r.error : `${r.critical} critical · ${r.major} major · ${r.minor} minor`}</span>`;
       breakdownBody.appendChild(row);
     });
     breakdownSection.classList.add('visible');
@@ -558,7 +551,7 @@ function renderResults(results) {
     if (multi) {
       const heading = document.createElement('div');
       heading.className = 'file-group-heading';
-      heading.innerHTML = `<span class="fgh-name">${r.fileName}</span><span class="fgh-score">Score: ${r.score} — ${r.grade}</span>`;
+      heading.innerHTML = `<span class="fgh-name">${r.fileName}</span><span class="fgh-issues">${r.total} issue${r.total !== 1 ? 's' : ''}</span>`;
       issuesList.appendChild(heading);
     }
 
@@ -639,28 +632,27 @@ async function buildWordReport(results) {
     // Overview table
     children.push(p("Overview",{h:HeadingLevel.HEADING_1,size:28,bold:true,color:CHERRY,before:160,after:80}));
     const overviewRows = [
-      new TableRow({children:["File","Score","Grade","Critical","Major","Minor"].map(h=>tc(h,"1F4E79",{bold:true,color:WHITE}))}),
+      new TableRow({children:["File","Total Issues","Critical","Major","Minor"].map(h=>tc(h,"1F4E79",{bold:true,color:WHITE}))}),
       ...results.map(r => new TableRow({children:[
         tc(r.fileName,"FFFFFF"),
-        tc(r.error?"—":String(r.score),"FFFFFF"),
-        tc(r.error?"Error":r.grade,"FFFFFF"),
+        tc(r.error?"—":String(r.total),"FFFFFF"),
         tc(String(r.critical||0),"FFE0E0"),
         tc(String(r.major||0),"FFF2CC"),
         tc(String(r.minor||0),"EBF3FB"),
       ]}))
     ];
-    children.push(new Table({width:{size:9360,type:WidthType.DXA},columnWidths:[3360,1200,1800,1000,1000,1000],rows:overviewRows}));
+    children.push(new Table({width:{size:9360,type:WidthType.DXA},columnWidths:[3960,1400,1400,1400,1400],rows:overviewRows}));
     children.push(p("",{before:160,after:0}));
 
     // Combined totals
     children.push(p("Combined Totals",{h:HeadingLevel.HEADING_1,size:28,bold:true,color:CHERRY,before:240,after:80}));
     children.push(new Table({width:{size:9360,type:WidthType.DXA},columnWidths:[2340,2340,2340,2340],rows:[
-      new TableRow({children:["Critical issues","Major issues","Minor issues","Average score"].map(h=>tc(h,"1F4E79",{bold:true,color:WHITE}))}),
+      new TableRow({children:["Critical issues","Major issues","Minor issues","Total issues"].map(h=>tc(h,"1F4E79",{bold:true,color:WHITE}))}),
       new TableRow({children:[
         [String(agg.critical),"FFE0E0","9B1010"],
         [String(agg.major),"FFF2CC","7A4A00"],
         [String(agg.minor),"EBF3FB","1F4E79"],
-        [String(agg.avgScore),"E2EFDA","2D6A4F"],
+        [String(agg.total),"E2EFDA","2D6A4F"],
       ].map(([v,bg,c])=>new TableCell({borders,shading:shade(bg),margins:{top:70,bottom:70,left:120,right:120},children:[
         new Paragraph({spacing:{before:60,after:60},children:[new TextRun({text:v,font:"Calibri",size:24,bold:true,color:c})]})
       ]}))})
@@ -681,13 +673,14 @@ async function buildWordReport(results) {
     }
 
     // Meta table
+    const totalBg = data.critical > 0 ? sevBg.critical : data.major > 0 ? sevBg.major : data.minor > 0 ? sevBg.minor : "E2EFDA";
     children.push(new Table({width:{size:9360,type:WidthType.DXA},columnWidths:[1800,7560],rows:[
       ["File",data.fileName,"F7F7F7"],
       ["File type",data.fileType?.toUpperCase()||"","FFFFFF"],
-      ["Score",`${data.score} out of 100 — ${data.grade}`,sevBg[data.grade?.toLowerCase()]||"F2F2F2"],
+      ["Total issues",`${data.total} issue${data.total !== 1 ? 's' : ''} found`,totalBg],
     ].map(([l,v,bg])=>new TableRow({children:[
       tc(l,"1F4E79",{bold:true,color:WHITE,w:1800}),
-      new TableCell({borders,shading:shade(bg),margins:{top:70,bottom:70,left:120,right:120},width:{size:7560,type:WidthType.DXA},children:[cp(v,{bold:l==="Score",color:BLACK})]})
+      new TableCell({borders,shading:shade(bg),margins:{top:70,bottom:70,left:120,right:120},width:{size:7560,type:WidthType.DXA},children:[cp(v,{bold:l==="Total issues",color:BLACK})]})
     ]}))}));
     children.push(p("",{before:120,after:0}));
 
