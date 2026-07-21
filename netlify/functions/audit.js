@@ -7,9 +7,6 @@
 const pdfParse = require('pdf-parse');
 const mammoth  = require('mammoth');
 
-// ── Severity weights (matches Python engine) ──
-const WEIGHTS = { critical: 15, major: 8, minor: 3 };
-
 // ── Bad link text patterns ──
 const BAD_LINK = /^(click here|here|read more|more|link|this|download|view|see more|learn more|this link|click|url|www\.|http)$/i;
 const isBadLink = t => BAD_LINK.test(t.trim()) || t.trim().length < 3;
@@ -36,24 +33,18 @@ function passesContrastAA(fg, bg, large = false) {
 // ── Result builder ──
 function makeResult(fileName, fileType) {
   const issues = [], passed = [];
-  let score = 100;
   return {
     fileName, fileType, issues, passed,
-    get score() { return Math.max(0, score); },
     addIssue(severity, rule, description, location, howToFix, wcagRef = '') {
       issues.push({ severity, rule, description, location, howToFix, wcagRef });
-      score -= WEIGHTS[severity] || 0;
     },
     addPass(check) { passed.push(check); },
     summary() {
       const criticals = issues.filter(i => i.severity === 'critical');
       const majors    = issues.filter(i => i.severity === 'major');
       const minors    = issues.filter(i => i.severity === 'minor');
-      const s = Math.max(0, score);
       return {
         fileName, fileType,
-        score: Math.round(s * 10) / 10,
-        grade: s === 100 ? 'Perfect' : s >= 80 ? 'Good' : s >= 60 ? 'Needs work' : s >= 40 ? 'Poor' : 'Critical',
         critical: criticals.length, major: majors.length, minor: minors.length,
         total: issues.length, passed: passed.length,
         issues: [...issues].sort((a,b) => ({critical:0,major:1,minor:2}[a.severity] - ({critical:0,major:1,minor:2}[b.severity]))),
