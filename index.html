@@ -56,6 +56,7 @@
   .file-row-info { flex:1; min-width:0; }
   .file-row-name { font-size:13px; font-weight:600; color:var(--ink); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .file-row-size { font-size:11px; color:var(--ink-l); }
+  .file-row-doctype { font-size:11.5px; font-family:'DM Sans',sans-serif; color:var(--ink-m); background:var(--white); border:1px solid var(--border); border-radius:6px; padding:5px 8px; flex-shrink:0; cursor:pointer; }
   .file-row-remove { background:none; border:1px solid var(--border); border-radius:6px; cursor:pointer; font-size:12px; padding:5px 9px; color:var(--ink-m); font-family:'DM Sans',sans-serif; flex-shrink:0; }
   .file-row-remove:hover { background:var(--white); color:var(--cherry); }
 
@@ -265,6 +266,19 @@ uz.addEventListener('drop', e => {
 function handleFileInput(e) { if (e.target.files.length) loadFiles(e.target.files); }
 function handleFolderInput(e) { if (e.target.files.length) loadFiles(e.target.files); }
 
+// ── Course-design element scan: which "type" a file is tagged as ──
+function guessDocType(filename) {
+  const n = filename.toLowerCase();
+  if (n.includes('syllabus')) return 'syllabus';
+  if (n.includes('course map') || n.includes('coursemap')) return 'course-map';
+  if (n.includes('schedule')) return 'schedule';
+  return 'accessibility-only';
+}
+
+function setDocType(idx, value) {
+  uploadedFiles[idx].docType = value;
+}
+
 // ── File loading / validation ──
 function loadFiles(fileList) {
   const incoming = Array.from(fileList);
@@ -273,7 +287,7 @@ function loadFiles(fileList) {
     const ext = file.name.split('.').pop().toLowerCase();
     if (!VALID_EXT.includes(ext)) return; // silently skip non-document files (e.g. images in a folder)
     const dup = uploadedFiles.some(f => f.name === file.name && f.size === file.size);
-    if (!dup) valid.push(file);
+    if (!dup) { file.docType = guessDocType(file.name); valid.push(file); }
   });
   uploadedFiles = uploadedFiles.concat(valid);
   renderFileList();
@@ -325,6 +339,12 @@ function renderFileList() {
         <div class="file-row-name">${file.name}</div>
         <div class="file-row-size">${(file.size/1024).toFixed(1)} KB</div>
       </div>
+      <select class="file-row-doctype" onchange="setDocType(${idx}, this.value)" aria-label="Document type for ${file.name}">
+        <option value="accessibility-only" ${file.docType === 'accessibility-only' ? 'selected' : ''}>Accessibility Only</option>
+        <option value="syllabus" ${file.docType === 'syllabus' ? 'selected' : ''}>Syllabus</option>
+        <option value="course-map" ${file.docType === 'course-map' ? 'selected' : ''}>Course Map</option>
+        <option value="schedule" ${file.docType === 'schedule' ? 'selected' : ''}>Schedule</option>
+      </select>
       <button class="file-row-remove" onclick="removeFile(${idx})" aria-label="Remove ${file.name}">✕</button>`;
     list.appendChild(row);
   });
@@ -764,3 +784,4 @@ function downloadReport() {
 </script>
 </body>
 </html>
+
