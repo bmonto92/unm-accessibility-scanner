@@ -17,9 +17,9 @@ ELEMENT 2 - Course Alignment: Student learning outcomes (CLOs) are clearly state
 
 ELEMENT 3 - Assignment Criteria & Evaluation Guidelines: The syllabus provides an overview of major assignment categories and their evaluation criteria.
 
-ELEMENT 4 - Scaffolding: The syllabus explains how coursework throughout the semester builds toward the final project/major assessment.
+ELEMENT 4 - Scaffolding: The syllabus explains how coursework throughout the semester builds toward the final project/major assessment. IMPORTANT: True scaffolding depends on how assignments are actually sequenced across all course modules, which these documents cannot show. Only mark "fulfilled" if the syllabus gives a SPECIFIC explanation of the build-up (not generic phrases like "assignments build on each other"). Otherwise mark "not_verifiable", not "not_fulfilled" — the syllabus alone can't fairly judge this.
 
-ELEMENT 5 - Practice and Application: The syllabus indicates students have consistent, recurring opportunities to apply what they're learning (not a one-time final only).
+ELEMENT 5 - Practice and Application: The syllabus indicates students have consistent, recurring opportunities to apply what they're learning (not a one-time final only). IMPORTANT: Whether this actually happens depends on the real assignments in each module, which these documents cannot show. Only mark "fulfilled" if the syllabus lists specific recurring assignment types (e.g. "weekly quizzes," "a reflection due each module"). Otherwise mark "not_verifiable" rather than guessing from general assignment-category language.
 
 ELEMENT 13 - Instructor-Student Interactions: The syllabus states how/when students can reach the instructor (e.g. office hours, drop-in hours, response-time policy).
 
