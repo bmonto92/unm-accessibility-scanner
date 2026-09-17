@@ -93,13 +93,20 @@ ${scheduleText || '(not provided)'}`;
       throw new Error(`Claude API error ${response.status}: ${errText}`);
     }
 
-    const data = await response.json();
-    const rawText = data.content?.[0]?.text || '[]';
+        const data = await response.json();
+    const textBlock = (data.content || []).find(b => b.type === 'text');
+    const rawText = textBlock?.text || '';
+
+    if (!rawText) {
+      console.error('No text block in Claude response:', JSON.stringify(data));
+      throw new Error('Claude returned no readable text — check Vercel function logs for details.');
+    }
+
+    // Claude may wrap JSON in ```json fences despite instructions — strip if present
     const cleaned = rawText.replace(/^```json\s*/i, '').replace(/```\s*$/, '').trim();
     const elementResults = JSON.parse(cleaned);
 
     res.status(200).json({ elements: elementResults });
-
   } catch (err) {
     console.error('Element scan error:', err);
     res.status(500).json({ error: err.message });
