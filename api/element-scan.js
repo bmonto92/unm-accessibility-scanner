@@ -3,6 +3,7 @@
 // Excellence Framework elements that live in those documents (not Canvas).
 
 const mammoth = require('mammoth');
+const pdfParse = require('pdf-parse');
 
 const ELEMENT_RUBRIC = `You are reviewing UNM course documents (Syllabus, Course Map, and/or Course Schedule) against 9 elements of UNM's Online Learning Excellence Framework. For EACH element below, read the document text provided and decide:
 
