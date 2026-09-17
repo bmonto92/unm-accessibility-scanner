@@ -236,6 +236,11 @@
     ⬇️ Download Full Report (.docx)
   </button>
 
+  <!-- Download course design elements report (only appears if a Syllabus/Course Map/Schedule was tagged) -->
+  <button class="download-btn" id="download-element-btn" onclick="downloadElementReport()" style="background:var(--cherry-d);" aria-label="Download course design elements report as Word document">
+    ⬇️ Download Course Design Elements Report (.docx)
+  </button>
+
 </main>
 
 <footer style="text-align:center; padding:20px 0 8px; font-size:11px; color:var(--ink-l);">
@@ -249,6 +254,7 @@
 let uploadedFiles  = [];   // array of File objects
 let auditResults   = [];   // array of per-file summary objects, in order
 let reportBuffer   = null;
+let elementScanBuffer = null; // Word report buffer for the course-design element scan (Syllabus/Course Map/Schedule)
 
 const VALID_EXT = ['pdf','docx','pptx','doc','ppt'];
 const icons = { pdf:'📕', docx:'📝', pptx:'📊', doc:'📝', ppt:'📊' };
@@ -359,7 +365,70 @@ function resetResults() {
   document.getElementById('breakdown-section').classList.remove('visible');
   document.getElementById('issues-section').classList.remove('visible');
   document.getElementById('download-btn').classList.remove('visible');
+  document.getElementById('download-element-btn').classList.remove('visible');
   auditResults = []; reportBuffer = null;
+  elementScanBuffer = null;
+}
+
+function fileToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload  = () => resolve(reader.result.split(',')[1]);
+    reader.onerror = () => reject(new Error('Could not read file'));
+    reader.readAsDataURL(file);
+  });
+}
+
+// ── Course design element scan: sends whichever files were tagged
+// Syllabus / Course Map / Schedule to /api/element-scan and builds the
+// second (separate) Word report from the result. Silently does nothing
+// if no files were tagged. ──
+async function runElementScan() {
+  const taggedFiles = uploadedFiles.filter(f => f.docType && f.docType !== 'accessibility-only');
+  if (taggedFiles.length === 0) return;
+
+  addStatus('Checking course design elements (Syllabus / Course Map / Schedule)…');
+
+  const findByType = (type) => taggedFiles.find(f => f.docType === type) || null;
+  const syllabusFile  = findByType('syllabus');
+  const courseMapFile = findByType('course-map');
+  const scheduleFile  = findByType('schedule');
+
+  try {
+    const [syllabusB64, mapB64, scheduleB64] = await Promise.all([
+      syllabusFile  ? fileToBase64(syllabusFile)  : Promise.resolve(null),
+      courseMapFile ? fileToBase64(courseMapFile) : Promise.resolve(null),
+      scheduleFile  ? fileToBase64(scheduleFile)  : Promise.resolve(null),
+    ]);
+
+    const body = {
+      syllabus:  syllabusFile  ? { fileName: syllabusFile.name,  fileData: syllabusB64 } : null,
+      courseMap: courseMapFile ? { fileName: courseMapFile.name, fileData: mapB64 }      : null,
+      schedule:  scheduleFile  ? { fileName: scheduleFile.name,  fileData: scheduleB64 }  : null,
+    };
+
+    const res = await fetch('/api/element-scan', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || `Server error ${res.status}`);
+    }
+
+    const data = await res.json();
+    updateLast('Course design element check complete ✓', 'done');
+
+    elementScanBuffer = await buildElementReport(data.elements, {
+      syllabus: syllabusFile?.name, courseMap: courseMapFile?.name, schedule: scheduleFile?.name
+    });
+    document.getElementById('download-element-btn').classList.add('visible');
+
+  } catch (err) {
+    updateLast('Course design element check failed: ' + err.message, 'err');
+  }
 }
 
 // ── Status helpers ──
@@ -504,6 +573,8 @@ async function runAudit() {
   } catch (e) {
     updateLast('Could not build Word report: ' + e.message, 'err');
   }
+
+  await runElementScan();
 
   document.getElementById('audit-btn').disabled = false;
 }
@@ -781,7 +852,93 @@ function downloadReport() {
   a.click();
   URL.revokeObjectURL(a.href);
 }
+
+// ── Build the Course Design Elements Word report (separate from the accessibility report) ──
+async function buildElementReport(elements, docsUsed) {
+  const { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell,
+          HeadingLevel, BorderStyle, WidthType, ShadingType } = docx;
+
+  const CHERRY="5C1010", BLUE="1F4E79", BLACK="000000", WHITE="FFFFFF";
+  const bd = {style:BorderStyle.SINGLE,size:1,color:"CCCCCC"};
+  const borders={top:bd,bottom:bd,left:bd,right:bd};
+  const shade = fill => ({type:ShadingType.CLEAR,color:"auto",fill});
+
+  const statusBg    = {fulfilled:"E2EFDA", not_fulfilled:"FFE0E0", not_verifiable:"FFF2CC"};
+  const statusColor = {fulfilled:"2D6A4F", not_fulfilled:"9B1010", not_verifiable:"7A4A00"};
+  const statusLabel = {fulfilled:"FULFILLED", not_fulfilled:"NOT FULFILLED", not_verifiable:"NOT VERIFIABLE — DEPENDS ON CANVAS-ONLY CONTENT"};
+
+  const p = (text,opts={}) => new Paragraph({
+    ...(opts.h?{heading:opts.h}:{}),
+    spacing:{before:opts.before||40,after:opts.after||80},
+    children:[new TextRun({text:String(text||''),font:"Calibri",size:opts.size||22,
+      bold:opts.bold||false,italic:opts.italic||false,color:opts.color||BLACK})]
+  });
+  const cp = (text,opts={}) => new Paragraph({spacing:{before:60,after:60},children:[
+    new TextRun({text:String(text||''),font:"Calibri",size:20,bold:opts.bold||false,color:opts.color||BLACK})
+  ]});
+  const tc = (text,bg,opts={}) => new TableCell({borders,shading:shade(bg||"FFFFFF"),
+    margins:{top:70,bottom:70,left:120,right:120},
+    ...(opts.w?{width:{size:opts.w,type:WidthType.DXA}}:{}),
+    children:[cp(text,opts)]});
+
+  const children = [];
+  children.push(p("Course Design Elements Report",{h:HeadingLevel.HEADING_1,size:36,bold:true,color:CHERRY,before:0,after:60}));
+  children.push(p("UNM Online Learning Excellence Framework — checked against Syllabus, Course Map, and Course Schedule",{size:19,italic:true,color:"595959",before:0,after:120}));
+
+  const docsLine = [
+    docsUsed.syllabus  ? `Syllabus: ${docsUsed.syllabus}`     : 'Syllabus: not provided',
+    docsUsed.courseMap ? `Course Map: ${docsUsed.courseMap}`  : 'Course Map: not provided',
+    docsUsed.schedule  ? `Schedule: ${docsUsed.schedule}`     : 'Schedule: not provided',
+  ].join('   |   ');
+  children.push(p(docsLine,{size:19,color:"595959",before:0,after:200}));
+
+  (elements || []).forEach((el, i) => {
+    const bg    = statusBg[el.status] || "F2F2F2";
+    const color = statusColor[el.status] || BLACK;
+    const label = statusLabel[el.status] || (el.status || '').toUpperCase();
+
+    children.push(p(`ELEMENT ${el.element}`,{h:HeadingLevel.HEADING_1,size:24,bold:true,color:BLUE,before:i===0?0:240,after:60}));
+
+    const tbl = new Table({width:{size:9360,type:WidthType.DXA},columnWidths:[1800,7560],rows:[
+      new TableRow({children:[tc("Status",BLUE,{bold:true,color:WHITE,w:1800}),
+        new TableCell({borders,shading:shade(bg),margins:{top:70,bottom:70,left:120,right:120},width:{size:7560,type:WidthType.DXA},
+          children:[cp(label,{bold:true,color})]})]}),
+      new TableRow({children:[tc("Evidence","F2F2F2",{bold:true,w:1800}),
+        new TableCell({borders,shading:shade("FFFFFF"),margins:{top:70,bottom:70,left:120,right:120},width:{size:7560,type:WidthType.DXA},
+          children:[cp(el.evidence || 'none found')]})]}),
+      new TableRow({children:[tc("Recommendation","F2F2F2",{bold:true,w:1800}),
+        new TableCell({borders,shading:shade("FFFFFF"),margins:{top:70,bottom:70,left:120,right:120},width:{size:7560,type:WidthType.DXA},
+          children:[cp(el.recommendation || 'none needed')]})]}),
+    ]});
+    children.push(tbl);
+  });
+
+  children.push(new Paragraph({spacing:{before:240,after:0},border:{top:{style:BorderStyle.SINGLE,size:1,color:"CCCCCC"}},
+    children:[new TextRun({text:"Generated by the Document Accessibility Checker — Course Design Elements companion report. This is an AI-assisted review: verify any \"Not Fulfilled\" finding before treating it as final, especially where content may also live in Canvas.",
+      font:"Calibri",size:18,italic:true,color:"808080"})]}));
+
+  const document = new Document({
+    title: "Course Design Elements Report",
+    description: "UNM Online Learning Excellence Framework element check — syllabus/course map/schedule",
+    styles:{
+      default:{document:{run:{font:"Calibri",size:22,color:BLACK}}},
+      paragraphStyles:[
+        {id:"Heading1",name:"Heading 1",basedOn:"Normal",next:"Normal",quickFormat:true,run:{size:28,bold:true,font:"Calibri",color:CHERRY},paragraph:{spacing:{before:240,after:80},outlineLevel:0}},
+      ]
+    },
+    sections:[{properties:{page:{margin:{top:1440,right:1440,bottom:1440,left:1440}}},children}]
+  });
+  return await Packer.toBlob(document);
+}
+
+function downloadElementReport() {
+  if (!elementScanBuffer) return;
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([elementScanBuffer], {type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'}));
+  a.download = 'course_design_elements_report.docx';
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
 </script>
 </body>
 </html>
-
