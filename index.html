@@ -401,12 +401,16 @@ async function runElementScan() {
       scheduleFile  ? fileToBase64(scheduleFile)  : Promise.resolve(null),
     ]);
 
-    const body = {
-      syllabus:  syllabusFile  ? { fileName: syllabusFile.name,  fileData: syllabusB64 } : null,
-      courseMap: courseMapFile ? { fileName: courseMapFile.name, fileData: mapB64 }      : null,
-      schedule:  scheduleFile  ? { fileName: scheduleFile.name,  fileData: scheduleB64 }  : null,
-    };
+    const typeOf = (file) => {
+  const ext = file.name.split('.').pop().toLowerCase();
+  return ext === 'doc' ? 'docx' : ext;
+};
 
+const body = {
+  syllabus:  syllabusFile  ? { fileName: syllabusFile.name,  fileType: typeOf(syllabusFile),  fileData: syllabusB64 } : null,
+  courseMap: courseMapFile ? { fileName: courseMapFile.name, fileType: typeOf(courseMapFile),  fileData: mapB64 }      : null,
+  schedule:  scheduleFile  ? { fileName: scheduleFile.name,  fileType: typeOf(scheduleFile),  fileData: scheduleB64 }  : null,
+};
     const res = await fetch('/api/element-scan', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
