@@ -49,9 +49,13 @@ module.exports = async (req, res) => {
       return;
     }
 
-    const extractText = async (doc) => {
+        const extractText = async (doc) => {
       if (!doc || !doc.fileData) return null;
       const buffer = Buffer.from(doc.fileData, 'base64');
+      if (doc.fileType === 'pdf') {
+        const data = await pdfParse(buffer);
+        return data.text || '';
+      }
       const { value } = await mammoth.extractRawText({ buffer });
       return value;
     };
