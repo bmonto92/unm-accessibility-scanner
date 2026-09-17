@@ -83,7 +83,7 @@ ${scheduleText || '(not provided)'}`;
       },
       body: JSON.stringify({
         model: 'claude-sonnet-5',   // match the model string the notes-cleaner uses
-        max_tokens: 2000,
+        max_tokens: 4000,
         messages: [{ role: 'user', content: ELEMENT_RUBRIC + '\n\n' + docSection }],
       }),
     });
